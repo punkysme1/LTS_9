@@ -27,8 +27,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        // PERBAIKAN: Menghapus variabel 'type' yang tidak pernah digunakan untuk lolos linting 'noUnusedParameters'.
-        const { name, value } = e.target;
+        const { name, value, type } = e.target;
         const isNumber = (name === 'copyYear' || name === 'pageCount') && value !== '';
         setFormData({ ...formData, [name]: isNumber ? parseInt(value, 10) : value });
     };
@@ -121,7 +120,7 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
             ...formData,
             snippet: formData.content.substring(0, 150) + '...',
             publish_date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-            imageUrl: formData.imageUrl,
+            image_url: formData.imageUrl,
         };
 
         const { error } = article
@@ -156,6 +155,164 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
     );
 };
 
+// --- Mass Upload Modal ---
+const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: () => void }> = ({ isOpen, onClose, onSave }) => {
+    const [file, setFile] = useState<File | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
+
+    const headers = ['title', 'author', 'inventoryCode', 'digitalCode', 'status', 'scribe', 'copyYear', 'pageCount', 'ink', 'category', 'language', 'script', 'size', 'description', 'condition', 'readability', 'colophon', 'thumbnailUrl', 'imageUrls', 'googleDriveUrl'];
+
+    const handleDownloadTemplate = () => {
+        const csvContent = headers.join(',') + '\n';
+        const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel' });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "template_manuskrip.xls");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setFile(e.target.files[0]);
+            setError(null);
+            setSuccess(null);
+        }
+    };
+
+    const handleUpload = async () => {
+        if (!file) {
+            setError("Silakan pilih file untuk diunggah.");
+            return;
+        }
+        setLoading(true);
+        setError(null);
+        setSuccess(null);
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const text = event.target?.result as string;
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            if (lines.length < 2) {
+                setError("File CSV kosong atau hanya berisi header.");
+                setLoading(false);
+                return;
+            }
+
+            const fileHeaders = lines[0].trim().split(',').map(h => h.trim());
+            // Basic header validation
+            if (JSON.stringify(fileHeaders) !== JSON.stringify(headers)) {
+                setError("Header file tidak cocok dengan template. Pastikan Anda menyimpan sebagai CSV dari template yang disediakan.");
+                setLoading(false);
+                return;
+            }
+
+            const manuscriptsToUpload = [];
+            const validationErrors: string[] = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].trim().split(',');
+                if (values.length !== headers.length) {
+                    validationErrors.push(`Baris ${i + 1}: Jumlah kolom (${values.length}) tidak sesuai dengan template (${headers.length}). Pastikan tidak ada koma di dalam data Anda.`);
+                    continue; 
+                }
+                const row: any = headers.reduce((obj, header, index) => {
+                    obj[header] = values[index] || '';
+                    return obj;
+                }, {} as any);
+
+                // Validation logic
+                if (!row.title) validationErrors.push(`Baris ${i + 1}: Judul tidak boleh kosong.`);
+                if (row.status && !statuses.includes(row.status as any)) validationErrors.push(`Baris ${i + 1}: Status tidak valid: "${row.status}".`);
+                if (row.category && !categories.includes(row.category as any)) validationErrors.push(`Baris ${i + 1}: Kategori tidak valid: "${row.category}".`);
+                if (row.language && !languages.includes(row.language as any)) validationErrors.push(`Baris ${i + 1}: Bahasa tidak valid: "${row.language}".`);
+                if (row.script && !scripts.includes(row.script as any)) validationErrors.push(`Baris ${i + 1}: Aksara tidak valid: "${row.script}".`);
+                if (row.readability && !readabilities.includes(row.readability as any)) validationErrors.push(`Baris ${i + 1}: Keterbacaan tidak valid: "${row.readability}".`);
+                if (row.copyYear && isNaN(parseInt(row.copyYear))) validationErrors.push(`Baris ${i + 1}: Tahun salin harus berupa angka.`);
+                if (row.pageCount && isNaN(parseInt(row.pageCount))) validationErrors.push(`Baris ${i + 1}: Jumlah halaman harus berupa angka.`);
+
+                manuscriptsToUpload.push(row);
+            }
+
+            if (validationErrors.length > 0) {
+                setError("Kesalahan Validasi:\n" + validationErrors.join('\n'));
+                setLoading(false);
+                return;
+            }
+
+            const dbData = manuscriptsToUpload.map(ms => ({
+                title: ms.title, author: ms.author, inventory_code: ms.inventoryCode, digital_code: ms.digitalCode,
+                status: ms.status, scribe: ms.scribe, copy_year: ms.copyYear ? parseInt(ms.copyYear, 10) : null,
+                page_count: ms.pageCount ? parseInt(ms.pageCount, 10) : null, ink: ms.ink, category: ms.category,
+                language: ms.language, script: ms.script, size: ms.size, description: ms.description,
+                condition: ms.condition, readability: ms.readability, colophon: ms.colophon,
+                thumbnail_url: ms.thumbnailUrl || `https://picsum.photos/seed/${Date.now()}/400/500`,
+                image_urls: ms.imageUrls ? ms.imageUrls.split(';').map((url: string) => url.trim()).filter(Boolean) : [],
+                google_drive_url: ms.googleDriveUrl
+            }));
+
+            const { error: insertError } = await supabase.from('manuscripts').insert(dbData);
+            if (insertError) {
+                setError(`Gagal menyimpan ke database: ${insertError.message}`);
+            } else {
+                setSuccess(`${manuscriptsToUpload.length} manuskrip berhasil diunggah.`);
+                onSave();
+                setTimeout(() => {
+                  onClose();
+                  setSuccess(null);
+                  setFile(null);
+                }, 2000);
+            }
+            setLoading(false);
+        };
+        reader.readAsText(file);
+    };
+    
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+                <h2 className="font-serif text-2xl font-bold text-brand-dark mb-4">Mass Upload Manuskrip</h2>
+                <div className="space-y-4">
+                    <p className="text-gray-600">Unggah file format .csv untuk menambahkan beberapa manuskrip sekaligus. Unduh template Excel di bawah ini dan pastikan untuk menyimpannya sebagai .csv sebelum mengunggah.</p>
+                    <div>
+                        <Button type="button" variant="secondary" onClick={handleDownloadTemplate}>Unduh Template Excel (.xls)</Button>
+                    </div>
+                    <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-md">
+                        <p className="font-semibold">Instruksi Penting:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                            <li>Unduh template dan buka dengan Microsoft Excel atau spreadsheet editor lainnya.</li>
+                            <li>Isi data manuskrip sesuai kolom. **Jangan ubah urutan atau nama kolom**.</li>
+                            <li>Setelah selesai, simpan file sebagai **CSV (Comma-Separated Values) (*.csv)**.</li>
+                            <li>Unggah file **.csv** yang sudah Anda simpan.</li>
+                            <li>Untuk kolom `imageUrls`, pisahkan beberapa URL dengan titik koma (;).</li>
+                            <li>Pastikan data Anda tidak mengandung koma (,), karena akan merusak format CSV.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <label htmlFor="csv-upload" className="block text-sm font-medium text-gray-700 mb-1">Pilih File CSV untuk Diunggah</label>
+                        <Input id="csv-upload" type="file" accept=".csv" onChange={handleFileChange} className="file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-dark hover:file:bg-brand-accent/40"/>
+                    </div>
+                    {loading && <Spinner />}
+                    {error && <div className="text-red-600 bg-red-100 p-3 rounded-md whitespace-pre-wrap">{error}</div>}
+                    {success && <div className="text-green-800 bg-green-100 p-3 rounded-md">{success}</div>}
+                </div>
+                <div className="flex justify-end space-x-4 mt-6 pt-4 border-t">
+                    <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>Batal</Button>
+                    <Button type="button" onClick={handleUpload} disabled={loading || !file}>{loading ? 'Mengunggah...' : 'Unggah File'}</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- Main Admin Page Component ---
 const AdminPage: React.FC = () => {
@@ -170,6 +327,7 @@ const AdminPage: React.FC = () => {
     const [editingBlogArticle, setEditingBlogArticle] = useState<BlogArticle | null>(null);
     
     const [guestbookEntries, setGuestbookEntries] = useState<GuestbookEntry[]>([]);
+    const [showMassUploadModal, setShowMassUploadModal] = useState(false);
 
 
     const fetchData = useCallback(async () => {
@@ -237,8 +395,7 @@ const AdminPage: React.FC = () => {
                                      </tr>
                                  </thead>
                                  <tbody>
-                                     {/* PERBAIKAN: Menambahkan tipe eksplisit 'GuestbookEntry' pada parameter 'entry' */}
-                                     {guestbookEntries.map((entry: GuestbookEntry) => (
+                                     {guestbookEntries.map(entry => (
                                          <tr key={entry.id} className="border-b hover:bg-gray-50">
                                              <td className="p-2 font-semibold">{entry.name} <br/><span className="font-normal text-sm text-gray-500">{entry.origin}</span></td>
                                              <td className="p-2 text-sm">{entry.message}</td>
@@ -260,16 +417,18 @@ const AdminPage: React.FC = () => {
                     <div className="space-y-12">
                         {/* Manuscript Management */}
                         <div className="bg-white p-8 rounded-lg shadow-lg">
-                            <div className="flex justify-between items-center mb-6">
+                            <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
                                 <h2 className="font-serif text-2xl font-bold text-brand-dark">Manajemen Manuskrip ({manuscripts.length})</h2>
-                                <Button onClick={() => { setEditingManuscript(null); setView('manuscript_form'); }}>Tambah Baru</Button>
+                                <div className="flex items-center space-x-2">
+                                    <Button variant="secondary" onClick={() => setShowMassUploadModal(true)}>Upload Massal</Button>
+                                    <Button onClick={() => { setEditingManuscript(null); setView('manuscript_form'); }}>Tambah Baru</Button>
+                                </div>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
                                     <thead><tr className="border-b"><th className="p-2">Judul</th><th className="p-2 hidden sm:table-cell">Pengarang</th><th className="p-2 hidden md:table-cell">Kode</th><th className="p-2">Aksi</th></tr></thead>
                                     <tbody>
-                                        {/* PERBAIKAN: Menambahkan tipe eksplisit 'Manuscript' pada parameter 'ms' */}
-                                        {manuscripts.slice(0, 5).map((ms: Manuscript) => (
+                                        {manuscripts.slice(0, 5).map(ms => (
                                             <tr key={ms.id} className="border-b hover:bg-gray-50">
                                                 <td className="p-2 font-semibold">{ms.title}</td>
                                                 <td className="p-2 hidden sm:table-cell">{ms.author}</td>
@@ -296,8 +455,7 @@ const AdminPage: React.FC = () => {
                                 <table className="w-full text-left">
                                     <thead><tr className="border-b"><th className="p-2">Judul Artikel</th><th className="p-2 hidden sm:table-cell">Penulis</th><th className="p-2">Aksi</th></tr></thead>
                                     <tbody>
-                                        {/* PERBAIKAN: Menambahkan tipe eksplisit 'BlogArticle' pada parameter 'article' */}
-                                        {blogArticles.slice(0, 5).map((article: BlogArticle) => (
+                                        {blogArticles.slice(0, 5).map(article => (
                                             <tr key={article.id} className="border-b hover:bg-gray-50">
                                                 <td className="p-2 font-semibold">{article.title}</td>
                                                 <td className="p-2 hidden sm:table-cell">{article.author}</td>
@@ -316,8 +474,7 @@ const AdminPage: React.FC = () => {
                         {/* Guestbook Management */}
                          <div className="bg-white p-8 rounded-lg shadow-lg">
                             <h2 className="font-serif text-xl font-bold text-brand-dark mb-4">Manajemen Buku Tamu</h2>
-                             {/* PERBAIKAN: Menambahkan tipe eksplisit 'GuestbookEntry' pada parameter 'e' */}
-                            <p className="text-sm text-gray-600 mb-4">Moderasi pesan pengunjung yang masuk. ({guestbookEntries.filter((e: GuestbookEntry) => !e.is_approved).length} pesan menunggu persetujuan)</p>
+                            <p className="text-sm text-gray-600 mb-4">Moderasi pesan pengunjung yang masuk. ({guestbookEntries.filter(e => !e.is_approved).length} pesan menunggu persetujuan)</p>
                             <Button variant="secondary" onClick={() => setView('guestbook_moderation')}>Kelola Buku Tamu</Button>
                         </div>
                     </div>
@@ -338,6 +495,13 @@ const AdminPage: React.FC = () => {
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
                 {renderContent()}
             </div>
+            <MassUploadModal 
+                isOpen={showMassUploadModal}
+                onClose={() => setShowMassUploadModal(false)}
+                onSave={() => {
+                    fetchData();
+                }}
+            />
         </div>
     );
 };
