@@ -27,7 +27,8 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target;
+        // PERBAIKAN: Menghapus variabel 'type' yang tidak pernah digunakan untuk lolos linting 'noUnusedParameters'.
+        const { name, value } = e.target;
         const isNumber = (name === 'copyYear' || name === 'pageCount') && value !== '';
         setFormData({ ...formData, [name]: isNumber ? parseInt(value, 10) : value });
     };
@@ -120,7 +121,7 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
             ...formData,
             snippet: formData.content.substring(0, 150) + '...',
             publish_date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-            image_url: formData.imageUrl,
+            imageUrl: formData.imageUrl,
         };
 
         const { error } = article
@@ -236,7 +237,8 @@ const AdminPage: React.FC = () => {
                                      </tr>
                                  </thead>
                                  <tbody>
-                                     {guestbookEntries.map(entry => (
+                                     {/* PERBAIKAN: Menambahkan tipe eksplisit 'GuestbookEntry' pada parameter 'entry' */}
+                                     {guestbookEntries.map((entry: GuestbookEntry) => (
                                          <tr key={entry.id} className="border-b hover:bg-gray-50">
                                              <td className="p-2 font-semibold">{entry.name} <br/><span className="font-normal text-sm text-gray-500">{entry.origin}</span></td>
                                              <td className="p-2 text-sm">{entry.message}</td>
@@ -266,7 +268,8 @@ const AdminPage: React.FC = () => {
                                 <table className="w-full text-left">
                                     <thead><tr className="border-b"><th className="p-2">Judul</th><th className="p-2 hidden sm:table-cell">Pengarang</th><th className="p-2 hidden md:table-cell">Kode</th><th className="p-2">Aksi</th></tr></thead>
                                     <tbody>
-                                        {manuscripts.slice(0, 5).map(ms => (
+                                        {/* PERBAIKAN: Menambahkan tipe eksplisit 'Manuscript' pada parameter 'ms' */}
+                                        {manuscripts.slice(0, 5).map((ms: Manuscript) => (
                                             <tr key={ms.id} className="border-b hover:bg-gray-50">
                                                 <td className="p-2 font-semibold">{ms.title}</td>
                                                 <td className="p-2 hidden sm:table-cell">{ms.author}</td>
@@ -293,7 +296,8 @@ const AdminPage: React.FC = () => {
                                 <table className="w-full text-left">
                                     <thead><tr className="border-b"><th className="p-2">Judul Artikel</th><th className="p-2 hidden sm:table-cell">Penulis</th><th className="p-2">Aksi</th></tr></thead>
                                     <tbody>
-                                        {blogArticles.slice(0, 5).map(article => (
+                                        {/* PERBAIKAN: Menambahkan tipe eksplisit 'BlogArticle' pada parameter 'article' */}
+                                        {blogArticles.slice(0, 5).map((article: BlogArticle) => (
                                             <tr key={article.id} className="border-b hover:bg-gray-50">
                                                 <td className="p-2 font-semibold">{article.title}</td>
                                                 <td className="p-2 hidden sm:table-cell">{article.author}</td>
@@ -312,7 +316,8 @@ const AdminPage: React.FC = () => {
                         {/* Guestbook Management */}
                          <div className="bg-white p-8 rounded-lg shadow-lg">
                             <h2 className="font-serif text-xl font-bold text-brand-dark mb-4">Manajemen Buku Tamu</h2>
-                            <p className="text-sm text-gray-600 mb-4">Moderasi pesan pengunjung yang masuk. ({guestbookEntries.filter(e => !e.is_approved).length} pesan menunggu persetujuan)</p>
+                             {/* PERBAIKAN: Menambahkan tipe eksplisit 'GuestbookEntry' pada parameter 'e' */}
+                            <p className="text-sm text-gray-600 mb-4">Moderasi pesan pengunjung yang masuk. ({guestbookEntries.filter((e: GuestbookEntry) => !e.is_approved).length} pesan menunggu persetujuan)</p>
                             <Button variant="secondary" onClick={() => setView('guestbook_moderation')}>Kelola Buku Tamu</Button>
                         </div>
                     </div>
