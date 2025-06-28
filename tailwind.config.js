@@ -2,7 +2,7 @@
 export default {
   content: [
     "./index.html",
-    "./{components,services,App,index}.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,ts,jsx,tsx}", // <-- INI PERBAIKANNYA
   ],
   theme: {
     extend: {
