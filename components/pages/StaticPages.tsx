@@ -27,9 +27,15 @@ export const BlogPage: React.FC = () => {
             
             if (error) {
                 console.error("Error fetching blog articles:", error);
-            } else {
-                 const formattedData = data.map((item: any) => ({
-                    ...item,
+            } else if (data) {
+                // PERBAIKAN: Menghindari penggunaan tipe 'any' untuk keamanan dan konsistensi.
+                 const formattedData: BlogArticle[] = data.map((item) => ({
+                    id: item.id,
+                    created_at: item.created_at,
+                    title: item.title,
+                    author: item.author,
+                    content: item.content,
+                    snippet: item.snippet,
                     imageUrl: item.image_url,
                     publishDate: new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
                 }));
@@ -81,7 +87,7 @@ export const GuestbookPage: React.FC = () => {
         
         if (error) {
             console.error("Error fetching guestbook entries:", error);
-        } else {
+        } else if (data) {
             setEntries(data);
         }
         setLoading(false);
@@ -199,8 +205,9 @@ export const ContactPage: React.FC = () => (
                         <p><strong>Jam Operasional:</strong> Senin - Jumat, 09:00 - 16:00 WIB</p>
                      </div>
                       <div className="mt-8">
+                        {/* CATATAN PENTING: Ganti URL 'src' di bawah ini dengan URL embed dari Google Maps yang sebenarnya. */}
                         <iframe 
-                            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3953.172030138947!2d110.37586541527773!3d-7.771543979201534!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e7a584f2850993d%3A0x27435f4961825155!2sUniversitas%20Gadjah%20Mada!5e0!3m2!1sen!2sid!4v1663214567890!5m2!1sen!2sid" 
+                            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3953.167253509422!2d110.38923931535974!3d-7.7720279943969!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e7a59a1e2f9b0bb%3A0x7c45a0a3a1ad5a45!2sUniversitas%20Gadjah%20Mada!5e0!3m2!1sen!2sid!4v1627545899851!5m2!1sen!2sid" 
                             width="100%" 
                             height="300" 
                             style={{border:0}} 
