@@ -2,7 +2,7 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}", // <-- INI PERBAIKANNYA
+    "./**/*.{js,ts,jsx,tsx}", // <-- INI PERBAIKAN FINAL. Memindai semua file di semua folder dari root.
   ],
   theme: {
     extend: {
