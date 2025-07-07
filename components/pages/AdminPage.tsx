@@ -16,14 +16,14 @@ const scripts: Manuscript['script'][] = ['Pegon', 'Jawa', 'Jawi', 'Arab', 'Sunda
 const readabilities: Manuscript['readability'][] = ['Baik', 'Cukup', 'Sulit Dibaca'];
 
 const emptyManuscript: ManuscriptFormData = {
-  title: '', author: '', inventoryCode: '', digitalCode: '', status: 'Tersedia', scribe: '', 
-  copyYear: new Date().getFullYear(), pageCount: 0, ink: '', category: 'Lainnya', language: 'Jawa', 
-  script: 'Pegon', size: '', description: '', condition: '', readability: 'Cukup', colophon: '', 
+  title: '', author: '', inventoryCode: '', digitalCode: '', status: 'Tersedia', scribe: '',
+  copyYear: new Date().getFullYear(), pageCount: 0, ink: '', category: 'Lainnya', language: 'Jawa',
+  script: 'Pegon', size: '', description: '', condition: '', readability: 'Cukup', colophon: '',
   thumbnailUrl: '', imageUrls: [], googleDriveUrl: ''
 };
 
 const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => void, onCancel: () => void }> = ({ manuscript, onSave, onCancel }) => {
-    const [formData, setFormData] = useState<any>(manuscript ? { ...manuscript, imageUrls: manuscript.imageUrls?.join(', ') || '' } : { ...emptyManuscript, imageUrls: '' });
+    const [formData, setFormData] = useState<any>(manuscript || emptyManuscript);
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -35,14 +35,27 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        
+
         const dbData = {
-            title: formData.title, author: formData.author, inventory_code: formData.inventoryCode, digital_code: formData.digitalCode,
-            status: formData.status, scribe: formData.scribe, copy_year: formData.copyYear, page_count: formData.pageCount,
-            ink: formData.ink, category: formData.category, language: formData.language, script: formData.script, size: formData.size,
-            description: formData.description, condition: formData.condition, readability: formData.readability, colophon: formData.colophon,
-            thumbnail_url: formData.thumbnailUrl || `https://picsum.photos/seed/${Date.now()}/400/500`,
-            image_urls: formData.imageUrls.split(',').map((url:string) => url.trim()).filter(Boolean),
+            title: formData.title,
+            author: formData.author,
+            inventory_code: formData.inventoryCode,
+            digital_code: formData.digitalCode,
+            status: formData.status,
+            scribe: formData.scribe,
+            copy_year: formData.copyYear,
+            page_count: formData.pageCount,
+            ink: formData.ink,
+            category: formData.category,
+            language: formData.language,
+            script: formData.script,
+            size: formData.size,
+            description: formData.description,
+            condition: formData.condition,
+            readability: formData.readability,
+            colophon: formData.colophon,
+            thumbnail_url: formData.thumbnailUrl || '', // Opsional, sebagai fallback
+            image_urls: [], // Dikosongkan, karena sumber utama dari Google Drive
             google_drive_url: formData.googleDriveUrl
         };
 
@@ -82,13 +95,12 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
                     <Input name="size" value={formData.size} onChange={handleChange} placeholder="Ukuran (cth: 25 x 18 cm)" />
                     <Select name="readability" value={formData.readability} onChange={handleChange}>{readabilities.map(s => <option key={s} value={s}>{s}</option>)}</Select>
                 </div>
-                <Input name="thumbnailUrl" value={formData.thumbnailUrl} onChange={handleChange} placeholder="URL Gambar Thumbnail" />
-                <Input name="googleDriveUrl" value={formData.googleDriveUrl} onChange={handleChange} placeholder="URL Folder Google Drive" />
+                <Input name="googleDriveUrl" value={formData.googleDriveUrl} onChange={handleChange} placeholder="URL Folder Google Drive" required />
+                <Input name="thumbnailUrl" value={formData.thumbnailUrl} onChange={handleChange} placeholder="URL Thumbnail (Opsional)" />
                 <textarea name="description" value={formData.description} onChange={handleChange} placeholder="Deskripsi" className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-accent" rows={3}></textarea>
                 <textarea name="condition" value={formData.condition} onChange={handleChange} placeholder="Kondisi Naskah" className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-accent" rows={3}></textarea>
                 <textarea name="colophon" value={formData.colophon} onChange={handleChange} placeholder="Kolofon" className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-accent" rows={2}></textarea>
-                <textarea name="imageUrls" value={formData.imageUrls} onChange={handleChange} placeholder="URL Gambar (pisahkan dengan koma)" className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-accent" rows={2}></textarea>
-                
+
                 <div className="flex space-x-4 pt-4">
                     <Button type="submit" disabled={loading}>{loading ? "Menyimpan..." : "Simpan"}</Button>
                     <Button type="button" variant="secondary" onClick={onCancel} disabled={loading}>Batal</Button>
@@ -143,8 +155,8 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
                 <Input name="title" value={formData.title} onChange={handleChange} placeholder="Judul Artikel" required />
                 <Input name="author" value={formData.author} onChange={handleChange} placeholder="Nama Penulis" required />
                 <Input name="imageUrl" value={formData.imageUrl} onChange={handleChange} placeholder="URL Gambar Utama" required />
-                <textarea name="content" value={formData.content} onChange={handleChange} placeholder="Isi konten artikel..." 
-                    className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-accent" 
+                <textarea name="content" value={formData.content} onChange={handleChange} placeholder="Isi konten artikel..."
+                    className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-accent"
                     rows={10} required></textarea>
                  <div className="flex space-x-4 pt-4">
                     <Button type="submit" disabled={loading}>{loading ? 'Menyimpan...' : 'Simpan Artikel'}</Button>
@@ -162,7 +174,8 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    const headers = ['title', 'author', 'inventoryCode', 'digitalCode', 'status', 'scribe', 'copyYear', 'pageCount', 'ink', 'category', 'language', 'script', 'size', 'description', 'condition', 'readability', 'colophon', 'thumbnailUrl', 'imageUrls', 'googleDriveUrl'];
+    // Hapus 'imageUrls' dan ganti dengan 'googleDriveUrl'
+    const headers = ['title', 'author', 'inventoryCode', 'digitalCode', 'status', 'scribe', 'copyYear', 'pageCount', 'ink', 'category', 'language', 'script', 'size', 'description', 'condition', 'readability', 'colophon', 'thumbnailUrl', 'googleDriveUrl'];
 
     const handleDownloadTemplate = () => {
         const csvContent = headers.join(',') + '\n';
@@ -207,7 +220,6 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
             }
 
             const fileHeaders = lines[0].trim().split(',').map(h => h.trim());
-            // Basic header validation
             if (JSON.stringify(fileHeaders) !== JSON.stringify(headers)) {
                 setError("Header file tidak cocok dengan template. Pastikan Anda menyimpan sebagai CSV dari template yang disediakan.");
                 setLoading(false);
@@ -221,7 +233,7 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
                 const values = lines[i].trim().split(',');
                 if (values.length !== headers.length) {
                     validationErrors.push(`Baris ${i + 1}: Jumlah kolom (${values.length}) tidak sesuai dengan template (${headers.length}). Pastikan tidak ada koma di dalam data Anda.`);
-                    continue; 
+                    continue;
                 }
                 const row: any = headers.reduce((obj, header, index) => {
                     obj[header] = values[index] || '';
@@ -230,13 +242,7 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
 
                 // Validation logic
                 if (!row.title) validationErrors.push(`Baris ${i + 1}: Judul tidak boleh kosong.`);
-                if (row.status && !statuses.includes(row.status as any)) validationErrors.push(`Baris ${i + 1}: Status tidak valid: "${row.status}".`);
-                if (row.category && !categories.includes(row.category as any)) validationErrors.push(`Baris ${i + 1}: Kategori tidak valid: "${row.category}".`);
-                if (row.language && !languages.includes(row.language as any)) validationErrors.push(`Baris ${i + 1}: Bahasa tidak valid: "${row.language}".`);
-                if (row.script && !scripts.includes(row.script as any)) validationErrors.push(`Baris ${i + 1}: Aksara tidak valid: "${row.script}".`);
-                if (row.readability && !readabilities.includes(row.readability as any)) validationErrors.push(`Baris ${i + 1}: Keterbacaan tidak valid: "${row.readability}".`);
-                if (row.copyYear && isNaN(parseInt(row.copyYear))) validationErrors.push(`Baris ${i + 1}: Tahun salin harus berupa angka.`);
-                if (row.pageCount && isNaN(parseInt(row.pageCount))) validationErrors.push(`Baris ${i + 1}: Jumlah halaman harus berupa angka.`);
+                if (!row.googleDriveUrl) validationErrors.push(`Baris ${i + 1}: URL Google Drive tidak boleh kosong.`);
 
                 manuscriptsToUpload.push(row);
             }
@@ -253,8 +259,8 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
                 page_count: ms.pageCount ? parseInt(ms.pageCount, 10) : null, ink: ms.ink, category: ms.category,
                 language: ms.language, script: ms.script, size: ms.size, description: ms.description,
                 condition: ms.condition, readability: ms.readability, colophon: ms.colophon,
-                thumbnail_url: ms.thumbnailUrl || `https://picsum.photos/seed/${Date.now()}/400/500`,
-                image_urls: ms.imageUrls ? ms.imageUrls.split(';').map((url: string) => url.trim()).filter(Boolean) : [],
+                thumbnail_url: ms.thumbnailUrl || '',
+                image_urls: [], // Dikosongkan
                 google_drive_url: ms.googleDriveUrl
             }));
 
@@ -274,7 +280,7 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
         };
         reader.readAsText(file);
     };
-    
+
     if (!isOpen) return null;
 
     return (
@@ -289,12 +295,12 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
                     <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-md">
                         <p className="font-semibold">Instruksi Penting:</p>
                         <ul className="list-disc list-inside space-y-1">
-                            <li>Unduh template dan buka dengan Microsoft Excel atau spreadsheet editor lainnya.</li>
+                            <li>Unduh template dan buka dengan Microsoft Excel atau editor spreadsheet lainnya.</li>
                             <li>Isi data manuskrip sesuai kolom. **Jangan ubah urutan atau nama kolom**.</li>
+                            <li>Kolom `googleDriveUrl` wajib diisi dengan link ke folder Google Drive yang berisi gambar manuskrip.</li>
+                            <li>Pastikan folder Google Drive telah disetel agar **"Siapa saja yang memiliki link"** dapat melihat isinya.</li>
                             <li>Setelah selesai, simpan file sebagai **CSV (Comma-Separated Values) (*.csv)**.</li>
                             <li>Unggah file **.csv** yang sudah Anda simpan.</li>
-                            <li>Untuk kolom `imageUrls`, pisahkan beberapa URL dengan titik koma (;).</li>
-                            <li>Pastikan data Anda tidak mengandung koma (,), karena akan merusak format CSV.</li>
                         </ul>
                     </div>
                     <div>
@@ -322,10 +328,10 @@ const AdminPage: React.FC = () => {
 
     const [manuscripts, setManuscripts] = useState<Manuscript[]>([]);
     const [editingManuscript, setEditingManuscript] = useState<Manuscript | null>(null);
-    
+
     const [blogArticles, setBlogArticles] = useState<BlogArticle[]>([]);
     const [editingBlogArticle, setEditingBlogArticle] = useState<BlogArticle | null>(null);
-    
+
     const [guestbookEntries, setGuestbookEntries] = useState<GuestbookEntry[]>([]);
     const [showMassUploadModal, setShowMassUploadModal] = useState(false);
 
@@ -341,7 +347,7 @@ const AdminPage: React.FC = () => {
         if(msRes.data) setManuscripts(msRes.data.map((item: any) => ({ ...item, inventoryCode: item.inventory_code, thumbnailUrl: item.thumbnail_url, imageUrls: item.image_urls })));
         if(blogRes.data) setBlogArticles(blogRes.data.map((item: any) => ({ ...item, imageUrl: item.image_url, publishDate: item.publish_date })));
         if(guestbookRes.data) setGuestbookEntries(guestbookRes.data);
-        
+
         setLoading(false);
     }, []);
 
@@ -360,7 +366,7 @@ const AdminPage: React.FC = () => {
             }
         }
     };
-    
+
     const handleToggleGuestbookApproval = async (entry: GuestbookEntry) => {
         const { error } = await supabase.from('guestbook_entries').update({ is_approved: !entry.is_approved }).eq('id', entry.id);
         if(error) alert('Gagal mengubah status: ' + error.message);
@@ -470,7 +476,7 @@ const AdminPage: React.FC = () => {
                                 {blogArticles.length > 5 && <p className="text-center mt-4 text-sm text-gray-500">Menampilkan 5 dari {blogArticles.length} artikel...</p>}
                             </div>
                         </div>
-                        
+
                         {/* Guestbook Management */}
                          <div className="bg-white p-8 rounded-lg shadow-lg">
                             <h2 className="font-serif text-xl font-bold text-brand-dark mb-4">Manajemen Buku Tamu</h2>
@@ -481,7 +487,7 @@ const AdminPage: React.FC = () => {
                 );
         }
     }
-    
+
     return (
         <div>
             <div className="bg-brand-dark text-white py-16">
@@ -495,7 +501,7 @@ const AdminPage: React.FC = () => {
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
                 {renderContent()}
             </div>
-            <MassUploadModal 
+            <MassUploadModal
                 isOpen={showMassUploadModal}
                 onClose={() => setShowMassUploadModal(false)}
                 onSave={() => {
