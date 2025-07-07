@@ -1,4 +1,3 @@
-// ManuscriptDetailPage.tsx (Updated)
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import type { Manuscript } from '../../types';
@@ -7,6 +6,10 @@ import { getCreativeStoryStream } from '../../services/geminiService';
 import { SparklesIcon } from '../Icons';
 import { supabase } from '../../services/supabaseClient';
 
+// Import library lightbox yang baru diinstal
+import Lightbox from "yet-another-react-lightbox";
+import "yet-another-react-lightbox/styles.css"; // Jangan lupa import CSS-nya
+
 // Helper untuk mengekstrak Folder ID dari URL Google Drive
 const getFolderIdFromUrl = (url: string): string | null => {
     if (!url) return null;
@@ -14,7 +17,7 @@ const getFolderIdFromUrl = (url: string): string | null => {
     return match ? match[1] : null;
 };
 
-// ... (Komponen DetailItem & GeminiStoryteller tetap sama) ...
+// Komponen DetailItem & GeminiStoryteller tetap sama
 const DetailItem: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
     <div className="border-b border-gray-200 py-3">
         <dt className="font-semibold text-brand-dark">{label}</dt>
@@ -23,6 +26,7 @@ const DetailItem: React.FC<{ label: string; value: React.ReactNode }> = ({ label
 );
 
 const GeminiStoryteller: React.FC<{ manuscript: Manuscript }> = ({ manuscript }) => {
+    // ... (kode komponen ini tidak perlu diubah)
     const [story, setStory] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -78,32 +82,28 @@ const GeminiStoryteller: React.FC<{ manuscript: Manuscript }> = ({ manuscript })
     );
 };
 
-
 const ManuscriptDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const [manuscript, setManuscript] = useState<Manuscript | null>(null);
     const [loading, setLoading] = useState(true);
-    
-    // State baru untuk menyimpan gambar dari Google Drive
     const [gdriveImages, setGdriveImages] = useState<{ id: string; url: string; thumbnail: string }[]>([]);
     const [imageLoading, setImageLoading] = useState(false);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+    // --- State baru untuk Lightbox ---
+    const [isLightboxOpen, setLightboxOpen] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState(0);
 
     useEffect(() => {
         const fetchManuscript = async () => {
             if (!id) return;
             setLoading(true);
-            const { data, error } = await supabase
-                .from('manuscripts')
-                .select('*')
-                .eq('id', id)
-                .single();
+            const { data, error } = await supabase.from('manuscripts').select('*').eq('id', id).single();
 
             if (error) {
                 console.error("Error fetching manuscript", error);
                 setManuscript(null);
             } else if (data) {
-                // Formatting data tetap sama, pastikan google_drive_url diambil
                 const formattedData = {
                     ...data,
                     inventoryCode: data.inventory_code,
@@ -111,7 +111,7 @@ const ManuscriptDetailPage: React.FC = () => {
                     copyYear: data.copy_year,
                     pageCount: data.page_count,
                     thumbnailUrl: data.thumbnail_url,
-                    imageUrls: [], // Kita tidak akan gunakan ini lagi
+                    imageUrls: [],
                     googleDriveUrl: data.google_drive_url,
                 };
                 setManuscript(formattedData);
@@ -121,7 +121,6 @@ const ManuscriptDetailPage: React.FC = () => {
         fetchManuscript();
     }, [id]);
 
-    // useEffect baru untuk mengambil gambar dari Google Drive setelah data manuskrip didapat
     useEffect(() => {
         if (manuscript?.googleDriveUrl) {
             const folderId = getFolderIdFromUrl(manuscript.googleDriveUrl);
@@ -131,15 +130,12 @@ const ManuscriptDetailPage: React.FC = () => {
                     setImageLoading(true);
                     setGdriveImages([]);
                     try {
-                        const { data, error } = await supabase.functions.invoke('get-gdrive-images', {
-                            body: { folderId },
-                        });
-
+                        const { data, error } = await supabase.functions.invoke('get-gdrive-images', { body: { folderId } });
                         if (error) throw error;
                         
                         if (data.images && data.images.length > 0) {
                             setGdriveImages(data.images);
-                            setSelectedImage(data.images[0].url); // Tampilkan gambar pertama secara default
+                            setSelectedImage(data.images[0].url);
                         }
                     } catch (e: any) {
                         console.error("Error fetching Google Drive images:", e.message);
@@ -147,18 +143,21 @@ const ManuscriptDetailPage: React.FC = () => {
                         setImageLoading(false);
                     }
                 };
-
                 fetchGdriveImages();
             }
         }
     }, [manuscript]);
 
+    const handleImageClick = (index: number) => {
+        setLightboxIndex(index);
+        setLightboxOpen(true);
+    };
+
     if (loading) return <Spinner />;
     if (!manuscript) return <div className="text-center py-16 text-xl">Manuskrip tidak ditemukan.</div>;
     
-    // Gunakan gdriveImages untuk menampilkan galeri
-    const imageGallery = gdriveImages.length > 0 ? gdriveImages : [];
     const mainImageSrc = selectedImage || manuscript.thumbnailUrl;
+    const currentImageIndex = gdriveImages.findIndex(img => img.url === selectedImage);
 
     return (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -166,7 +165,10 @@ const ManuscriptDetailPage: React.FC = () => {
                 {/* Left Column: Image Gallery */}
                 <div className="lg:col-span-2">
                     <div className="sticky top-24">
-                       <div className="bg-white p-4 rounded-lg shadow-lg flex items-center justify-center min-h-[400px]">
+                       <div 
+                           className="bg-white p-4 rounded-lg shadow-lg flex items-center justify-center min-h-[400px] cursor-pointer"
+                           onClick={() => handleImageClick(currentImageIndex > -1 ? currentImageIndex : 0)}
+                       >
                            {imageLoading ? <Spinner /> : mainImageSrc ? (
                                <img 
                                     src={mainImageSrc} 
@@ -177,10 +179,17 @@ const ManuscriptDetailPage: React.FC = () => {
                                <p className="text-gray-500">Tidak ada pratinjau gambar.</p>
                            )}
                        </div>
-                        {imageGallery.length > 1 && (
+                        {gdriveImages.length > 1 && (
                             <div className="grid grid-cols-4 gap-2 mt-4">
-                                {imageGallery.map((image, index) => (
-                                    <button key={image.id} onClick={() => setSelectedImage(image.url)} className={`rounded-md overflow-hidden border-2 ${selectedImage === image.url ? 'border-brand-accent' : 'border-transparent'} hover:border-brand-accent transition`}>
+                                {gdriveImages.map((image, index) => (
+                                    <button 
+                                        key={image.id} 
+                                        onClick={() => {
+                                            setSelectedImage(image.url); // Tetap update gambar utama
+                                            handleImageClick(index);      // Buka lightbox di gambar yg diklik
+                                        }} 
+                                        className={`rounded-md overflow-hidden border-2 ${selectedImage === image.url ? 'border-brand-accent' : 'border-transparent'} hover:border-brand-accent transition`}
+                                    >
                                         <img src={image.thumbnail} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover"/>
                                     </button>
                                 ))}
@@ -197,7 +206,6 @@ const ManuscriptDetailPage: React.FC = () => {
                         
                         <dl className="mt-6">
                             <DetailItem label="Deskripsi" value={<p className="whitespace-pre-wrap">{manuscript.description}</p>} />
-                            {/* ... sisa DetailItem lainnya ... */}
                             <DetailItem label="Kode Inventarisasi" value={manuscript.inventoryCode} />
                             <DetailItem label="Kode Digital" value={manuscript.digitalCode} />
                             <DetailItem label="Status" value={<span className={`px-2 py-1 text-xs font-semibold rounded-full ${manuscript.status === 'Tersedia' ? 'bg-green-100 text-green-800' : manuscript.status === 'Rusak Sebagian' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{manuscript.status}</span>} />
@@ -218,6 +226,17 @@ const ManuscriptDetailPage: React.FC = () => {
                     <GeminiStoryteller manuscript={manuscript} />
                 </div>
             </div>
+
+            {/* --- Komponen Lightbox diletakkan di sini --- */}
+            <Lightbox
+                open={isLightboxOpen}
+                close={() => setLightboxOpen(false)}
+                slides={gdriveImages.map(img => ({ src: img.url }))}
+                index={lightboxIndex}
+                on={{
+                    view: ({ index }) => setLightboxIndex(index), // Sinkronkan index lightbox
+                }}
+            />
         </div>
     );
 };
