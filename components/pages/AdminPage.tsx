@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, Input, Select, Spinner } from '../UI';
 import type { Manuscript, BlogArticle, GuestbookEntry } from '../../types';
 import { supabase } from '../../services/supabaseClient';
@@ -11,7 +11,6 @@ type BlogArticleFormData = Omit<BlogArticle, 'id' | 'created_at' | 'publishDate'
 
 // --- Manuscript Form Component ---
 const statuses: Manuscript['status'][] = ['Tersedia', 'Rusak Sebagian', 'Rapuh'];
-// Daftar kategori baru sesuai permintaan
 const categories: Manuscript['category'][] = [
   'Keilmuan Islam Umum',
   'Alquran dan Ilmu yang Berkaitan',
@@ -90,7 +89,6 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
                     <Input name="copyYear" type="number" value={formData.copyYear} onChange={handleChange} placeholder="Tahun Penyalinan" />
                     <Input name="pageCount" type="number" value={formData.pageCount} onChange={handleChange} placeholder="Jumlah Halaman" />
                     <Input name="ink" value={formData.ink} onChange={handleChange} placeholder="Tinta" />
-                    {/* Mengubah Bahasa dan Aksara menjadi input teks */}
                     <Input name="language" value={formData.language} onChange={handleChange} placeholder="Bahasa" />
                     <Input name="script" value={formData.script} onChange={handleChange} placeholder="Aksara" />
                     <Input name="size" value={formData.size} onChange={handleChange} placeholder="Ukuran (cth: 25 x 18 cm)" />
@@ -118,8 +116,6 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
         </div>
     );
 };
-
-// --- Sisa Komponen Lainnya (BlogForm, MassUploadModal, AdminPage) tidak perlu diubah ---
 
 const emptyBlogArticle: BlogArticleFormData = {
     title: '', author: '', content: '', imageUrl: ''
@@ -176,7 +172,6 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
     );
 };
 
-// --- Mass Upload Modal (Diubah Total untuk Excel) ---
 const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: () => void }> = ({ isOpen, onClose, onSave }) => {
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
@@ -185,7 +180,6 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
 
     const headers = ['title', 'author', 'inventoryCode', 'digitalCode', 'status', 'scribe', 'copyYear', 'pageCount', 'ink', 'category', 'language', 'script', 'size', 'description', 'condition', 'readability', 'colophon', 'thumbnailUrl', 'imageUrls'];
 
-    // Logika baru untuk mengunduh template .xlsx
     const handleDownloadTemplate = () => {
         const worksheet = XLSX.utils.aoa_to_sheet([headers]);
         const workbook = XLSX.utils.book_new();
@@ -201,7 +195,6 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
         }
     };
 
-    // Logika baru untuk membaca dan mengunggah file .xlsx
     const handleUpload = () => {
         if (!file) {
             setError("Silakan pilih file untuk diunggah.");
@@ -219,7 +212,6 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
                 
-                // Konversi sheet menjadi JSON, header akan menjadi key
                 const json_data: any[] = XLSX.utils.sheet_to_json(worksheet);
 
                 if (json_data.length === 0) {
@@ -254,7 +246,6 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
                 setLoading(false);
             }
         };
-        // Baca file sebagai ArrayBuffer, bukan teks
         reader.readAsArrayBuffer(file);
     };
     
@@ -282,7 +273,7 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
                         <Input 
                             id="xlsx-upload" 
                             type="file" 
-                            accept=".xlsx, .xls" // Ubah file yang diterima
+                            accept=".xlsx, .xls"
                             onChange={handleFileChange} 
                             className="file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-dark hover:file:bg-brand-accent/40"
                         />
@@ -300,7 +291,6 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
     );
 };
 
-
 const AdminPage: React.FC = () => {
     type View = 'dashboard' | 'manuscript_form' | 'blog_form' | 'guestbook_moderation';
     const [view, setView] = useState<View>('dashboard');
@@ -314,6 +304,10 @@ const AdminPage: React.FC = () => {
     
     const [guestbookEntries, setGuestbookEntries] = useState<GuestbookEntry[]>([]);
     const [showMassUploadModal, setShowMassUploadModal] = useState(false);
+    
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -323,8 +317,8 @@ const AdminPage: React.FC = () => {
             supabase.from('guestbook_entries').select('*').order('created_at', { ascending: false })
         ]);
 
-        if(msRes.data) setManuscripts(msRes.data.map((item: any) => ({ ...item, inventoryCode: item.inventory_code, thumbnailUrl: item.thumbnail_url, imageUrls: item.image_urls })));
-        if(blogRes.data) setBlogArticles(blogRes.data.map((item: any) => ({ ...item, imageUrl: item.image_url, publishDate: item.publish_date })));
+        if(msRes.data) setManuscripts(msRes.data);
+        if(blogRes.data) setBlogArticles(blogRes.data);
         if(guestbookRes.data) setGuestbookEntries(guestbookRes.data);
         
         setLoading(false);
@@ -333,6 +327,31 @@ const AdminPage: React.FC = () => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    const filteredManuscripts = useMemo(() => {
+        if (!searchQuery) {
+            return manuscripts;
+        }
+        const lowercasedQuery = searchQuery.toLowerCase();
+        return manuscripts.filter(ms => 
+            ms.title.toLowerCase().includes(lowercasedQuery) ||
+            (ms.author && ms.author.toLowerCase().includes(lowercasedQuery)) ||
+            (ms.inventoryCode && ms.inventoryCode.toLowerCase().includes(lowercasedQuery))
+        );
+    }, [manuscripts, searchQuery]);
+
+    const paginatedManuscripts = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredManuscripts.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredManuscripts, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredManuscripts.length / itemsPerPage);
+
+    const handlePageChange = (page: number) => {
+        if (page >= 1 && page <= totalPages) {
+            setCurrentPage(page);
+        }
+    };
 
     const handleDelete = async (table: string, id: string, name: string) => {
         if (window.confirm(`Apakah Anda yakin ingin menghapus "${name}"?`)) {
@@ -399,17 +418,30 @@ const AdminPage: React.FC = () => {
                     <div className="space-y-12">
                         <div className="bg-white p-8 rounded-lg shadow-lg">
                             <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-                                <h2 className="font-serif text-2xl font-bold text-brand-dark">Manajemen Manuskrip ({manuscripts.length})</h2>
+                                <h2 className="font-serif text-2xl font-bold text-brand-dark">Manajemen Manuskrip ({filteredManuscripts.length})</h2>
                                 <div className="flex items-center space-x-2">
                                     <Button variant="secondary" onClick={() => setShowMassUploadModal(true)}>Upload Massal</Button>
                                     <Button onClick={() => { setEditingManuscript(null); setView('manuscript_form'); }}>Tambah Baru</Button>
                                 </div>
                             </div>
+
+                            <div className="mb-6">
+                                <Input 
+                                    type="text"
+                                    placeholder="Cari berdasarkan Judul, Pengarang, atau Kode..."
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                />
+                            </div>
+
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
                                     <thead><tr className="border-b"><th className="p-2">Judul</th><th className="p-2 hidden sm:table-cell">Pengarang</th><th className="p-2 hidden md:table-cell">Kode</th><th className="p-2">Aksi</th></tr></thead>
                                     <tbody>
-                                        {manuscripts.slice(0, 5).map(ms => (
+                                        {paginatedManuscripts.length > 0 ? paginatedManuscripts.map(ms => (
                                             <tr key={ms.id} className="border-b hover:bg-gray-50">
                                                 <td className="p-2 font-semibold">{ms.title}</td>
                                                 <td className="p-2 hidden sm:table-cell">{ms.author}</td>
@@ -419,15 +451,37 @@ const AdminPage: React.FC = () => {
                                                     <button onClick={() => handleDelete('manuscripts', ms.id, ms.title)} className="text-red-600 hover:underline text-sm font-medium">Hapus</button>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        )) : (
+                                            <tr>
+                                                <td colSpan={4} className="text-center p-8 text-gray-500">Tidak ada manuskrip yang cocok dengan pencarian Anda.</td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
-                                {manuscripts.length > 5 && <p className="text-center mt-4 text-sm text-gray-500">Menampilkan 5 dari {manuscripts.length} manuskrip...</p>}
                             </div>
+
+                            {totalPages > 1 && (
+                                <div className="flex justify-between items-center mt-6">
+                                    <span className="text-sm text-gray-700">
+                                        Menampilkan {paginatedManuscripts.length} dari {filteredManuscripts.length} hasil
+                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                        <Button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} variant="secondary">
+                                            Sebelumnya
+                                        </Button>
+                                        <span className="text-sm font-bold px-2">
+                                            {currentPage}
+                                        </span>
+                                        <Button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} variant="secondary">
+                                            Selanjutnya
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-white p-8 rounded-lg shadow-lg">
-                            <div className="flex justify-between items-center mb-6">
+                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="font-serif text-2xl font-bold text-brand-dark">Manajemen Blog ({blogArticles.length})</h2>
                                 <Button onClick={() => { setEditingBlogArticle(null); setView('blog_form'); }}>Tulis Artikel Baru</Button>
                             </div>
