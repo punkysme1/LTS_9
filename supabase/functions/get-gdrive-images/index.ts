@@ -2,35 +2,27 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-// Ambil API Key dari Supabase secrets
 const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY')
 const API_URL = 'https://www.googleapis.com/drive/v3/files'
 
-// Header PENTING untuk penanganan CORS
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // Izinkan semua origin
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS', // Izinkan metode POST dan OPTIONS
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
-  // Blok ini KHUSUS untuk menangani preflight request (OPTIONS) dari browser
-  // Ini adalah bagian yang kemungkinan hilang atau salah
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     const { folderId } = await req.json()
-    if (!folderId) {
-      throw new Error('Folder ID is required')
-    }
-    if (!GOOGLE_API_KEY) {
-      throw new Error('Google API Key is not configured')
-    }
+    if (!folderId) { throw new Error('Folder ID is required') }
+    if (!GOOGLE_API_KEY) { throw new Error('Google API Key is not configured') }
 
     const query = encodeURIComponent(`'${folderId}' in parents and (mimeType='image/jpeg' or mimeType='image/png' or mimeType='image/gif')`)
-    const fields = encodeURIComponent('files(id, name, webContentLink, thumbnailLink)')
+    const fields = encodeURIComponent('files(id, name, thumbnailLink)')
     
     const fullUrl = `${API_URL}?q=${query}&key=${GOOGLE_API_KEY}&fields=${fields}&orderBy=name`
 
@@ -46,17 +38,16 @@ serve(async (req) => {
     const images = data.files.map((file: any) => ({
       id: file.id,
       name: file.name,
-      url: file.webContentLink,
+      // --- PERBAIKAN FINAL DENGAN FORMAT YANG TERBUKTI ---
+      url: `https://drive.google.com/uc?export=download&id=${file.id}`,
       thumbnail: file.thumbnailLink,
     }))
 
-    // Pastikan respons utama juga menyertakan header CORS
     return new Response(
       JSON.stringify({ images }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    // Pastikan respons eror juga menyertakan header CORS
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
