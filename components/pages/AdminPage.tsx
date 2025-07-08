@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Input, Select, Spinner } from '../UI';
 import type { Manuscript, BlogArticle, GuestbookEntry } from '../../types';
 import { supabase } from '../../services/supabaseClient';
+import * as XLSX from 'xlsx';
 
 // --- Type Definitions ---
 type ManuscriptFormData = Omit<Manuscript, 'id' | 'created_at'>;
