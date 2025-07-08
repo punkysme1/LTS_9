@@ -10,20 +10,29 @@ type BlogArticleFormData = Omit<BlogArticle, 'id' | 'created_at' | 'publishDate'
 
 // --- Manuscript Form Component ---
 const statuses: Manuscript['status'][] = ['Tersedia', 'Rusak Sebagian', 'Rapuh'];
-const categories: Manuscript['category'][] = ['Sejarah', 'Fikih', 'Sastra', 'Tasawuf', 'Lainnya'];
-const languages: Manuscript['language'][] = ['Jawa Kuno', 'Arab', 'Melayu', 'Jawa', 'Sunda'];
-const scripts: Manuscript['script'][] = ['Pegon', 'Jawa', 'Jawi', 'Arab', 'Sunda Kuno'];
+// Daftar kategori baru sesuai permintaan
+const categories: Manuscript['category'][] = [
+  'Keilmuan Islam Umum',
+  'Alquran dan Ilmu yang Berkaitan',
+  'Akaid dan Ilmu Kalam',
+  'Fiqih',
+  'Akhlaq dan Tasawwuf',
+  'Sosial dan Budaya',
+  'Filsafat dan Perkembangannya',
+  'Aliran dan Sekte dalam Islam',
+  'Hadits dan Ilmu yang berkaitan',
+  'Sejarah Islam dan Bibliografi'
+];
 const readabilities: Manuscript['readability'][] = ['Baik', 'Cukup', 'Sulit Dibaca'];
 
 const emptyManuscript: ManuscriptFormData = {
   title: '', author: '', inventoryCode: '', digitalCode: '', status: 'Tersedia', scribe: '', 
-  copyYear: new Date().getFullYear(), pageCount: 0, ink: '', category: 'Lainnya', language: 'Jawa', 
-  script: 'Pegon', size: '', description: '', condition: '', readability: 'Cukup', colophon: '', 
+  copyYear: new Date().getFullYear(), pageCount: 0, ink: '', category: 'Fiqih', language: '', 
+  script: '', size: '', description: '', condition: '', readability: 'Cukup', colophon: '', 
   thumbnailUrl: '', imageUrls: [], googleDriveUrl: ''
 };
 
 const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => void, onCancel: () => void }> = ({ manuscript, onSave, onCancel }) => {
-    // Gabungkan imageUrls menjadi string untuk ditampilkan di textarea
     const [formData, setFormData] = useState<any>(manuscript ? { ...manuscript, imageUrls: manuscript.imageUrls?.join(',\n') || '' } : { ...emptyManuscript, imageUrls: '' });
     const [loading, setLoading] = useState(false);
 
@@ -37,7 +46,6 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
         e.preventDefault();
         setLoading(true);
         
-        // Ubah string URL yang dipisahkan koma atau baris baru menjadi array URL yang bersih
         const imageUrlsArray = formData.imageUrls.split(/[\s,]+/).map((url:string) => url.trim()).filter(Boolean);
 
         const dbData = {
@@ -45,9 +53,9 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             status: formData.status, scribe: formData.scribe, copy_year: formData.copyYear, page_count: formData.pageCount,
             ink: formData.ink, category: formData.category, language: formData.language, script: formData.script, size: formData.size,
             description: formData.description, condition: formData.condition, readability: formData.readability, colophon: formData.colophon,
-            thumbnail_url: formData.thumbnailUrl || imageUrlsArray[0] || '', // Gunakan gambar pertama sebagai thumbnail jika thumbnail URL kosong
+            thumbnail_url: formData.thumbnailUrl || imageUrlsArray[0] || '',
             image_urls: imageUrlsArray,
-            google_drive_url: '', // Pastikan ini dikosongkan
+            google_drive_url: '',
         };
 
         let result;
@@ -81,8 +89,9 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
                     <Input name="copyYear" type="number" value={formData.copyYear} onChange={handleChange} placeholder="Tahun Penyalinan" />
                     <Input name="pageCount" type="number" value={formData.pageCount} onChange={handleChange} placeholder="Jumlah Halaman" />
                     <Input name="ink" value={formData.ink} onChange={handleChange} placeholder="Tinta" />
-                    <Select name="language" value={formData.language} onChange={handleChange}>{languages.map(s => <option key={s} value={s}>{s}</option>)}</Select>
-                    <Select name="script" value={formData.script} onChange={handleChange}>{scripts.map(s => <option key={s} value={s}>{s}</option>)}</Select>
+                    {/* Mengubah Bahasa dan Aksara menjadi input teks */}
+                    <Input name="language" value={formData.language} onChange={handleChange} placeholder="Bahasa" />
+                    <Input name="script" value={formData.script} onChange={handleChange} placeholder="Aksara" />
                     <Input name="size" value={formData.size} onChange={handleChange} placeholder="Ukuran (cth: 25 x 18 cm)" />
                     <Select name="readability" value={formData.readability} onChange={handleChange}>{readabilities.map(s => <option key={s} value={s}>{s}</option>)}</Select>
                 </div>
@@ -109,8 +118,8 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
     );
 };
 
+// --- Sisa Komponen Lainnya (BlogForm, MassUploadModal, AdminPage) tidak perlu diubah ---
 
-// --- Blog Form Component (Tidak berubah) ---
 const emptyBlogArticle: BlogArticleFormData = {
     title: '', author: '', content: '', imageUrl: ''
 };
@@ -166,29 +175,21 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
     );
 };
 
-// --- Mass Upload Modal (Disesuaikan untuk Cloudinary) ---
+// --- Mass Upload Modal (Diubah Total untuk Excel) ---
 const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: () => void }> = ({ isOpen, onClose, onSave }) => {
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    // Ganti googleDriveUrl dengan imageUrls
     const headers = ['title', 'author', 'inventoryCode', 'digitalCode', 'status', 'scribe', 'copyYear', 'pageCount', 'ink', 'category', 'language', 'script', 'size', 'description', 'condition', 'readability', 'colophon', 'thumbnailUrl', 'imageUrls'];
 
+    // Logika baru untuk mengunduh template .xlsx
     const handleDownloadTemplate = () => {
-        const csvContent = headers.join(',') + '\n';
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        if (link.download !== undefined) {
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", "template_manuskrip.csv");
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+        const worksheet = XLSX.utils.aoa_to_sheet([headers]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+        XLSX.writeFile(workbook, "template_manuskrip.xlsx");
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -199,7 +200,8 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
         }
     };
 
-    const handleUpload = async () => {
+    // Logika baru untuk membaca dan mengunggah file .xlsx
+    const handleUpload = () => {
         if (!file) {
             setError("Silakan pilih file untuk diunggah.");
             return;
@@ -210,43 +212,49 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
 
         const reader = new FileReader();
         reader.onload = async (event) => {
-            const text = event.target?.result as string;
-            // ... (logika validasi CSV, bisa disesuaikan lebih lanjut jika perlu)
-            const lines = text.split('\n').filter(line => line.trim() !== '');
+            try {
+                const data = event.target?.result;
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                
+                // Konversi sheet menjadi JSON, header akan menjadi key
+                const json_data: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-            const manuscriptsToUpload = lines.slice(1).map(line => {
-                const values = line.split(',');
-                let obj: any = {};
-                headers.forEach((header, i) => {
-                    obj[header] = values[i] ? values[i].trim() : '';
+                if (json_data.length === 0) {
+                    throw new Error("File Excel kosong atau formatnya salah.");
+                }
+
+                const dbData = json_data.map(ms => {
+                    const imageUrlsArray = ms.imageUrls ? String(ms.imageUrls).split(';').map((url: string) => url.trim()).filter(Boolean) : [];
+                    return {
+                        title: ms.title, author: ms.author, inventory_code: ms.inventoryCode, digital_code: ms.digitalCode,
+                        status: ms.status, scribe: ms.scribe, copy_year: ms.copyYear ? parseInt(String(ms.copyYear), 10) : null,
+                        page_count: ms.pageCount ? parseInt(String(ms.pageCount), 10) : null, ink: ms.ink, category: ms.category,
+                        language: ms.language, script: ms.script, size: ms.size, description: ms.description,
+                        condition: ms.condition, readability: ms.readability, colophon: ms.colophon,
+                        thumbnail_url: ms.thumbnailUrl || imageUrlsArray[0] || '',
+                        image_urls: imageUrlsArray
+                    };
                 });
-                return obj;
-            });
 
-            const dbData = manuscriptsToUpload.map(ms => {
-                const imageUrlsArray = ms.imageUrls ? ms.imageUrls.split(';').map((url: string) => url.trim()).filter(Boolean) : [];
-                return {
-                    title: ms.title, author: ms.author, inventory_code: ms.inventoryCode, digital_code: ms.digitalCode,
-                    status: ms.status, scribe: ms.scribe, copy_year: ms.copyYear ? parseInt(ms.copyYear, 10) : null,
-                    page_count: ms.pageCount ? parseInt(ms.pageCount, 10) : null, ink: ms.ink, category: ms.category,
-                    language: ms.language, script: ms.script, size: ms.size, description: ms.description,
-                    condition: ms.condition, readability: ms.readability, colophon: ms.colophon,
-                    thumbnail_url: ms.thumbnailUrl || imageUrlsArray[0] || '',
-                    image_urls: imageUrlsArray
-                };
-            });
-
-            const { error: insertError } = await supabase.from('manuscripts').insert(dbData);
-            if (insertError) {
-                setError(`Gagal menyimpan ke database: ${insertError.message}`);
-            } else {
-                setSuccess(`${manuscriptsToUpload.length} manuskrip berhasil diunggah.`);
+                const { error: insertError } = await supabase.from('manuscripts').insert(dbData);
+                if (insertError) {
+                    throw new Error(`Gagal menyimpan ke database: ${insertError.message}`);
+                }
+                
+                setSuccess(`${json_data.length} manuskrip berhasil diunggah.`);
                 onSave();
                 setTimeout(() => { onClose(); }, 2000);
+
+            } catch (e: any) {
+                setError(e.message || "Gagal memproses file Excel.");
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
-        reader.readAsText(file);
+        // Baca file sebagai ArrayBuffer, bukan teks
+        reader.readAsArrayBuffer(file);
     };
     
     if (!isOpen) return null;
@@ -254,23 +262,29 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
-                <h2 className="font-serif text-2xl font-bold text-brand-dark mb-4">Mass Upload Manuskrip</h2>
+                <h2 className="font-serif text-2xl font-bold text-brand-dark mb-4">Mass Upload Manuskrip (Excel)</h2>
                 <div className="space-y-4">
-                    <p className="text-gray-600">Unggah file format .csv untuk menambahkan beberapa manuskrip sekaligus.</p>
+                    <p className="text-gray-600">Unggah file format .xlsx untuk menambahkan beberapa manuskrip sekaligus.</p>
                     <div>
-                        <Button type="button" variant="secondary" onClick={handleDownloadTemplate}>Unduh Template CSV</Button>
+                        <Button type="button" variant="secondary" onClick={handleDownloadTemplate}>Unduh Template Excel</Button>
                     </div>
                     <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-md">
                         <p className="font-semibold">Instruksi Penting:</p>
                         <ul className="list-disc list-inside space-y-1">
-                            <li>Gunakan template yang disediakan.</li>
-                            <li>Untuk kolom `imageUrls`, masukkan beberapa URL Cloudinary dengan pemisah **titik koma (;)**.</li>
-                            <li>Pastikan data Anda tidak mengandung koma (,), karena akan merusak format CSV.</li>
+                            <li>Gunakan template yang disediakan. **Jangan ubah nama header kolom**.</li>
+                            <li>Untuk kolom `imageUrls`, masukkan beberapa URL dengan pemisah **titik koma (;)** jika lebih dari satu.</li>
+                            <li>Simpan dan unggah file dalam format **.xlsx** atau **.xls**.</li>
                         </ul>
                     </div>
                     <div>
-                        <label htmlFor="csv-upload" className="block text-sm font-medium text-gray-700 mb-1">Pilih File CSV</label>
-                        <Input id="csv-upload" type="file" accept=".csv" onChange={handleFileChange} className="file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-dark hover:file:bg-brand-accent/40"/>
+                        <label htmlFor="xlsx-upload" className="block text-sm font-medium text-gray-700 mb-1">Pilih File Excel</label>
+                        <Input 
+                            id="xlsx-upload" 
+                            type="file" 
+                            accept=".xlsx, .xls" // Ubah file yang diterima
+                            onChange={handleFileChange} 
+                            className="file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-dark hover:file:bg-brand-accent/40"
+                        />
                     </div>
                     {loading && <Spinner />}
                     {error && <div className="text-red-600 bg-red-100 p-3 rounded-md whitespace-pre-wrap">{error}</div>}
@@ -285,7 +299,7 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
     );
 };
 
-// --- Main Admin Page Component (Tidak berubah) ---
+
 const AdminPage: React.FC = () => {
     type View = 'dashboard' | 'manuscript_form' | 'blog_form' | 'guestbook_moderation';
     const [view, setView] = useState<View>('dashboard');
