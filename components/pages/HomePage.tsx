@@ -5,7 +5,7 @@ import { supabase } from '../../services/supabaseClient';
 import type { Manuscript, BlogArticle, GuestbookEntry } from '../../types';
 
 const HeroSection: React.FC = () => (
-    <div className="relative h-[60vh] bg-cover bg-center" style={{ backgroundImage: "url('https://picsum.photos/seed/hero/1600/900')" }}>
+    <div className="relative h-[60vh] bg-cover bg-center" style={{ backgroundImage: "url('https://res.cloudinary.com/dhz970cgz/image/upload/v1751971508/27._Hidayatus_Shibyan_jzc5jv.jpg')" }}>
         <div className="absolute inset-0 bg-brand-dark bg-opacity-60"></div>
         <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 h-full flex flex-col justify-center items-center text-center text-white">
             <h1 className="font-serif text-4xl md:text-6xl font-bold tracking-tight">Galeri Manuskrip Sampurnan</h1>
