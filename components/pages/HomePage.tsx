@@ -135,5 +135,39 @@ const HomePage: React.FC = () => {
         </div>
     );
 };
+const CategoryCounts: React.FC = () => {
+    const [categories, setCategories] = useState<{ kategori: string; jumlah: number }[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchCounts = async () => {
+            setLoading(true);
+            const { data, error } = await supabase.rpc('get_kategori_kailani_counts');
+            if (error) {
+                console.error("Error fetching category counts:", error);
+            } else {
+                setCategories(data);
+            }
+            setLoading(false);
+        };
+        fetchCounts();
+    }, []);
+
+    if (loading) return <div>Memuat kategori...</div>;
+
+    return (
+        <div className="bg-white p-8 rounded-lg shadow-lg">
+            <h2 className="text-2xl font-bold font-serif text-brand-dark mb-6 text-center">Kategori Manuskrip</h2>
+            <div className="flex flex-wrap justify-center gap-4">
+                {categories.map(cat => (
+                    <div key={cat.kategori} className="bg-brand-light text-brand-dark px-4 py-2 rounded-full shadow-sm text-center">
+                        <span className="font-semibold">{cat.kategori}</span>
+                        <span className="ml-2 bg-brand-accent text-white rounded-full px-2 py-0.5 text-xs font-bold">{cat.jumlah}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
 
 export default HomePage;

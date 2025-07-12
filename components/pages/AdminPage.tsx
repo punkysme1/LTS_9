@@ -2,35 +2,34 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Manuscript, BlogArticle, GuestbookEntry } from '../../types';
 import { supabase } from '../../services/supabaseClient';
 import * as XLSX from 'xlsx';
-
-// --- UI & ICONS ---
-// Pastikan Anda sudah menginstal react-icons: npm install react-icons
 import { 
     FaTachometerAlt, FaBook, FaNewspaper, FaComments, FaUserCircle, 
-    FaBars, FaPlus, FaUpload, FaDownload, FaPen, FaTrash
+    FaBars, FaPlus, FaUpload, FaDownload, FaPen, FaTrash 
 } from 'react-icons/fa';
-
-// Asumsi komponen UI ini ada di direktori ../UI
 import { Button, Input, Select, Spinner } from '../UI';
 
 // --- TYPE DEFINITIONS ---
 type ManuscriptFormData = Omit<Manuscript, 'id' | 'created_at'>;
-type BlogArticleFormData = Omit<BlogArticle, 'id' | 'created_at' | 'publishDate' | 'snippet'>;
+type BlogArticleFormData = Omit<BlogArticle, 'id' | 'created_at' | 'publishDate' | 'snippet' | 'imageUrl'> & { imageUrl?: string };
 type View = 'dashboard' | 'manuscripts' | 'manuscript_form' | 'blog' | 'blog_form' | 'guestbook';
 
-// --- FORM DEFAULTS & OPTIONS ---
-const statuses: Manuscript['status'][] = ['Tersedia', 'Rusak Sebagian', 'Rapuh'];
-const categories: Manuscript['category'][] = ['Keilmuan Islam Umum', 'Alquran dan Ilmu yang Berkaitan', 'Akaid dan Ilmu Kalam', 'Fiqih', 'Akhlaq dan Tasawwuf', 'Sosial dan Budaya', 'Filsafat dan Perkembangannya', 'Aliran dan Sekte dalam Islam', 'Hadits dan Ilmu yang berkaitan', 'Sejarah Islam dan Bibliografi'];
-const readabilities: Manuscript['readability'][] = ['Baik', 'Cukup', 'Sulit Dibaca'];
+// --- CONSTANTS & DEFAULTS ---
+const KATEGORI_KAILANI_OPTIONS = ['Keilmuan Islam Umum', 'Alquran dan Ilmu yang Berkaitan', 'Akaid dan Ilmu Kalam', 'Fiqih', 'Akhlaq dan Tasawwuf', 'Sosial dan Budaya', 'Filsafat dan Perkembangannya', 'Aliran dan Sekte dalam Islam', 'Hadits dan Ilmu yang berkaitan', 'Sejarah Islam dan Bibliografi'];
 
 const emptyManuscript: ManuscriptFormData = {
-  title: '', author: '', inventoryCode: '', digitalCode: '', status: 'Tersedia', scribe: '', 
-  copyYear: new Date().getFullYear(), pageCount: 0, ink: '', category: 'Fiqih', language: '', 
-  script: '', size: '', description: '', condition: '', readability: 'Cukup', colophon: '', 
-  thumbnailUrl: '', imageUrls: [], googleDriveUrl: ''
+  judul_dari_tim: '',
+  afiliasi: '', link_digital_afiliasi: '', nama_koleksi: '', nomor_digitalisasi: '', kode_inventarisasi: '',
+  link_kover: '', link_konten: [], link_digital_tppkp: '', nomor_koleksi: '', judul_dari_afiliasi: '',
+  halaman_pemisah: '', kategori_kailani: 'Keilmuan Islam Umum', kategori_ilmu_pesantren: '',
+  pengarang: '', penyalin: '', tahun_penulisan_teks: '', konversi_masehi: new Date().getFullYear(), lokasi_penyalinan: '', asal_usul_naskah: '',
+  bahasa: '', aksara: '',
+  watermark: '', countermark: '', kover: '', ukuran_kover: '', jilid: '', ukuran_kertas: '', ukuran_dimensi: '',
+  jumlah_halaman: 0, halaman_kosong: '', jumlah_baris_per_halaman: '', catatan_pinggir: false, catatan_makna: false,
+  rubrikasi: false, iluminasi: false, ilustrasi: false, tinta: '',
+  kondisi_fisik_naskah: '', keterbacaan: '', kelengkapan_naskah: '', kolofon: '', catatan_marginal: '', deskripsi_umum: '', catatan_catatan: ''
 };
 
-const emptyBlogArticle: BlogArticleFormData = {
+const emptyBlogArticle: Omit<BlogArticle, 'id' | 'created_at' | 'publishDate' | 'snippet'> = {
     title: '', author: '', content: '', imageUrl: ''
 };
 
@@ -41,7 +40,7 @@ const Card: React.FC<{ title: React.ReactNode; children: React.ReactNode; action
             <h3 className="card-title text-lg font-semibold text-gray-800">{title}</h3>
             {actions && <div className="card-tools flex items-center space-x-2">{actions}</div>}
         </div>
-        <div className="card-body p-6">{children}</div>
+        <div className="card-body p-4 sm:p-6">{children}</div>
     </div>
 );
 
@@ -59,30 +58,43 @@ const InfoBox: React.FC<{ title: string; value: string | number; icon: React.Rea
 
 // --- FORM COMPONENTS ---
 const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => void, onCancel: () => void }> = ({ manuscript, onSave, onCancel }) => {
-    const [formData, setFormData] = useState<any>(manuscript ? { ...manuscript, imageUrls: manuscript.imageUrls?.join(',\n') || '' } : { ...emptyManuscript, imageUrls: '' });
+    const [formData, setFormData] = useState<ManuscriptFormData>(() => {
+        if (!manuscript) return emptyManuscript;
+        const { id, created_at, ...rest } = manuscript;
+        return {
+            ...emptyManuscript,
+            ...rest,
+            link_konten: Array.isArray(rest.link_konten) ? rest.link_konten.join('\n') : '',
+        };
+    });
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        const isNumber = (name === 'copyYear' || name === 'pageCount') && value !== '';
-        setFormData({ ...formData, [name]: isNumber ? parseInt(value, 10) : value });
+        const { name, value, type } = e.target;
+        
+        if (type === 'checkbox') {
+            const { checked } = e.target as HTMLInputElement;
+            setFormData(prev => ({ ...prev, [name]: checked }));
+        } else {
+            const isNumber = ['konversi_masehi', 'jumlah_halaman'].includes(name) && value !== '';
+            setFormData(prev => ({ ...prev, [name]: isNumber ? parseInt(value, 10) : value }));
+        }
     };
-
+    
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!formData.judul_dari_tim) {
+            alert("Judul Dari Tim wajib diisi.");
+            return;
+        }
         setLoading(true);
-        
-        const imageUrlsArray = formData.imageUrls.split(/[\s,]+/).map((url:string) => url.trim()).filter(Boolean);
 
-        const dbData = {
-            title: formData.title, author: formData.author, inventory_code: formData.inventoryCode, digital_code: formData.digitalCode,
-            status: formData.status, scribe: formData.scribe, copy_year: formData.copyYear, page_count: formData.pageCount,
-            ink: formData.ink, category: formData.category, language: formData.language, script: formData.script, size: formData.size,
-            description: formData.description, condition: formData.condition, readability: formData.readability, colophon: formData.colophon,
-            thumbnail_url: formData.thumbnailUrl || imageUrlsArray[0] || '',
-            image_urls: imageUrlsArray,
-            google_drive_url: formData.googleDriveUrl || '',
-        };
+        const linkKontenArray = typeof formData.link_konten === 'string' 
+            ? formData.link_konten.split(/[\n,]+/).map(url => url.trim()).filter(Boolean) 
+            : [];
+        
+        // Buat objek data yang bersih untuk dikirim
+        const dbData = { ...formData, link_konten: linkKontenArray };
 
         const { error } = manuscript
             ? await supabase.from('manuscripts').update(dbData).eq('id', manuscript.id)
@@ -91,48 +103,123 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
         if (error) {
             alert('Error: ' + error.message);
         } else {
-            alert(`Manuskrip "${formData.title}" berhasil disimpan.`);
+            alert(`Manuskrip "${formData.judul_dari_tim}" berhasil disimpan.`);
             onSave();
         }
         setLoading(false);
     };
 
+    const renderField = (name: keyof ManuscriptFormData, label: string, type: 'input' | 'textarea' | 'select' | 'checkbox' = 'input', options: string[] = []) => {
+        const commonProps = { name, onChange: handleChange };
+        
+        if (type === 'checkbox') {
+            return (
+                <div className="flex items-center gap-2 col-span-1 pt-2">
+                    <input type="checkbox" id={name} {...commonProps} checked={!!formData[name]} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <label htmlFor={name} className="text-sm font-medium text-gray-700">{label}</label>
+                </div>
+            )
+        }
+
+        return (
+             <div className="col-span-1">
+                <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                {type === 'input' && <Input {...commonProps} id={name} value={formData[name] as string || ''} placeholder={label} />}
+                {type === 'textarea' && <textarea {...commonProps} id={name} value={formData[name] as string || ''} placeholder={label} rows={3} className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>}
+                {type === 'select' && (
+                    <Select {...commonProps} id={name} value={formData[name] as string || ''}>
+                        {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </Select>
+                )}
+            </div>
+        );
+    };
+
+    const FormSection: React.FC<{title: string; children: React.ReactNode}> = ({title, children}) => (
+        <div className="p-4 sm:p-6 bg-white rounded-lg shadow-md">
+            <h3 className="text-xl font-semibold mb-4 border-b pb-2 text-brand-dark">{title}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{children}</div>
+        </div>
+    );
+
     return (
-        <Card title={manuscript ? 'Edit Manuskrip' : 'Tambah Manuskrip Baru'}>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input name="title" value={formData.title} onChange={handleChange} placeholder="Judul" required />
-                    <Input name="author" value={formData.author} onChange={handleChange} placeholder="Pengarang" />
-                    <Input name="inventoryCode" value={formData.inventoryCode} onChange={handleChange} placeholder="Kode Inventaris" />
-                    <Input name="digitalCode" value={formData.digitalCode} onChange={handleChange} placeholder="Kode Digital" />
-                    <Select name="status" value={formData.status} onChange={handleChange}>{statuses.map(s => <option key={s} value={s}>{s}</option>)}</Select>
-                    <Select name="category" value={formData.category} onChange={handleChange}>{categories.map(s => <option key={s} value={s}>{s}</option>)}</Select>
-                    <Input name="scribe" value={formData.scribe} onChange={handleChange} placeholder="Penyalin" />
-                    <Input name="copyYear" type="number" value={formData.copyYear} onChange={handleChange} placeholder="Tahun Penyalinan" />
-                    <Input name="pageCount" type="number" value={formData.pageCount} onChange={handleChange} placeholder="Jumlah Halaman" />
-                    <Input name="ink" value={formData.ink} onChange={handleChange} placeholder="Tinta" />
-                    <Input name="language" value={formData.language} onChange={handleChange} placeholder="Bahasa" />
-                    <Input name="script" value={formData.script} onChange={handleChange} placeholder="Aksara" />
-                    <Input name="size" value={formData.size} onChange={handleChange} placeholder="Ukuran (cth: 25 x 18 cm)" />
-                    <Select name="readability" value={formData.readability} onChange={handleChange}>{readabilities.map(s => <option key={s} value={s}>{s}</option>)}</Select>
-                </div>
-                <Input name="thumbnailUrl" value={formData.thumbnailUrl} onChange={handleChange} placeholder="URL Gambar Thumbnail (Opsional)" />
-                <textarea name="imageUrls" value={formData.imageUrls} onChange={handleChange} placeholder="Tempel URL gambar, pisahkan dengan koma atau baris baru" className="w-full mt-2 px-3 py-2 border rounded-md" rows={4} required></textarea>
-                <textarea name="description" value={formData.description} onChange={handleChange} placeholder="Deskripsi" className="w-full mt-2 px-3 py-2 border rounded-md" rows={3}></textarea>
-                <textarea name="condition" value={formData.condition} onChange={handleChange} placeholder="Kondisi Naskah" className="w-full mt-2 px-3 py-2 border rounded-md" rows={3}></textarea>
-                <textarea name="colophon" value={formData.colophon} onChange={handleChange} placeholder="Kolofon" className="w-full mt-2 px-3 py-2 border rounded-md" rows={2}></textarea>
-                
-                <div className="flex space-x-4 pt-4 border-t mt-4">
-                    <Button type="submit" disabled={loading}>{loading ? "Menyimpan..." : "Simpan"}</Button>
-                    <Button type="button" variant="secondary" onClick={onCancel} disabled={loading}>Batal</Button>
-                </div>
-            </form>
-        </Card>
+        <form onSubmit={handleSubmit} className="space-y-8">
+            <FormSection title="Identitas & Afiliasi">
+                {renderField('judul_dari_tim', 'Judul Dari Tim (Wajib)')}
+                {renderField('judul_dari_afiliasi', 'Judul Dari Afiliasi')}
+                {renderField('afiliasi', 'Afiliasi')}
+                {renderField('link_digital_afiliasi', 'Link Digital Afiliasi')}
+                {renderField('nama_koleksi', 'Nama Koleksi')}
+                {renderField('nomor_koleksi', 'Nomor Koleksi')}
+                {renderField('nomor_digitalisasi', 'Nomor Digitalisasi')}
+                {renderField('kode_inventarisasi', 'Kode Inventarisasi')}
+                {renderField('link_digital_tppkp', 'Link Digital TPPKP Qomaruddin')}
+            </FormSection>
+
+            <FormSection title="Link Gambar">
+                 {renderField('link_kover', 'Link Kover (Thumbnail)')}
+                 {renderField('link_konten', 'Link Konten (URL per baris)', 'textarea')}
+            </FormSection>
+
+            <FormSection title="Klasifikasi & Kepengarangan">
+                 {renderField('kategori_kailani', 'Klasifikasi (Kailani)', 'select', KATEGORI_KAILANI_OPTIONS)}
+                 {renderField('kategori_ilmu_pesantren', 'Kategori Ilmu Pesantren')}
+                 {renderField('pengarang', 'Pengarang')}
+                 {renderField('penyalin', 'Penyalin')}
+                 {renderField('tahun_penulisan_teks', 'Tahun Penulisan di Teks')}
+                 {renderField('konversi_masehi', 'Konversi Masehi')}
+                 {renderField('lokasi_penyalinan', 'Lokasi Penyalinan')}
+                 {renderField('asal_usul_naskah', 'Asal Usul Naskah')}
+                 {renderField('bahasa', 'Bahasa')}
+                 {renderField('aksara', 'Aksara')}
+            </FormSection>
+
+            <FormSection title="Data Fisik Naskah">
+                {renderField('kover', 'Kover')}
+                {renderField('jilid', 'Jilid')}
+                {renderField('ukuran_kover', 'Ukuran Kover')}
+                {renderField('ukuran_kertas', 'Ukuran Kertas')}
+                {renderField('ukuran_dimensi', 'Ukuran Dimensi')}
+                {renderField('watermark', 'Watermark')}
+                {renderField('countermark', 'Countermark')}
+                {renderField('tinta', 'Tinta')}
+                {renderField('jumlah_halaman', 'Jumlah Halaman')}
+                {renderField('halaman_kosong', 'Halaman Kosong')}
+                {renderField('jumlah_baris_per_halaman', 'Jumlah Baris Per Halaman')}
+                {renderField('halaman_pemisah', 'Halaman Pemisah')}
+            </FormSection>
+             
+            <FormSection title="Seni & Rubrikasi">
+                {renderField('rubrikasi', 'Rubrikasi', 'checkbox')}
+                {renderField('iluminasi', 'Iluminasi', 'checkbox')}
+                {renderField('ilustrasi', 'Ilustrasi', 'checkbox')}
+            </FormSection>
+            
+            <FormSection title="Catatan Teks & Kondisi">
+                {renderField('catatan_pinggir', 'Catatan Pinggir', 'checkbox')}
+                {renderField('catatan_makna', 'Catatan Makna', 'checkbox')}
+                {renderField('catatan_marginal', 'Catatan Marginal (Koreksi, Komentar)', 'textarea')}
+                {renderField('kondisi_fisik_naskah', 'Kondisi Fisik Naskah', 'textarea')}
+                {renderField('keterbacaan', 'Keterbacaan')}
+                {renderField('kelengkapan_naskah', 'Kelengkapan Naskah')}
+                {renderField('kolofon', 'Kolofon', 'textarea')}
+            </FormSection>
+
+            <FormSection title="Deskripsi & Catatan Umum">
+                 {renderField('deskripsi_umum', 'Deskripsi Umum', 'textarea')}
+                 {renderField('catatan_catatan', 'Catatan-catatan', 'textarea')}
+            </FormSection>
+
+            <div className="flex space-x-4 pt-6 mt-8 border-t">
+                <Button type="submit" disabled={loading}>{loading ? "Menyimpan..." : "Simpan Manuskrip"}</Button>
+                <Button type="button" variant="secondary" onClick={onCancel} disabled={loading}>Batal</Button>
+            </div>
+        </form>
     );
 };
 
 const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCancel: () => void }> = ({ article, onSave, onCancel }) => {
-    const [formData, setFormData] = useState<BlogArticleFormData>(article || emptyBlogArticle);
+    const [formData, setFormData] = useState(article || emptyBlogArticle);
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -147,7 +234,6 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
             ...formData,
             snippet: formData.content.substring(0, 150) + '...',
             publish_date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-            image_url: formData.imageUrl,
         };
 
         const { error } = article
@@ -155,7 +241,7 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
             : await supabase.from('blog_articles').insert([dbData]);
 
         if (error) {
-            alert('Error: ' + error.message);
+            alert('Error saving article: ' + error.message);
         } else {
             alert(`Artikel "${formData.title}" berhasil disimpan.`);
             onSave();
@@ -179,14 +265,13 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
     );
 };
 
-// --- MODAL COMPONENT ---
 const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: () => void }> = ({ isOpen, onClose, onSave }) => {
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    const headers = ['title', 'author', 'inventoryCode', 'digitalCode', 'status', 'scribe', 'copyYear', 'pageCount', 'ink', 'category', 'language', 'script', 'size', 'description', 'condition', 'readability', 'colophon', 'thumbnailUrl', 'imageUrls'];
+    const headers = Object.keys(emptyManuscript);
 
     const handleDownloadTemplate = () => {
         const worksheet = XLSX.utils.aoa_to_sheet([headers]);
@@ -217,16 +302,21 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
                 const json_data: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
                 if (json_data.length === 0) throw new Error("File Excel kosong atau formatnya salah.");
+                
+                const dbData = json_data.map(row => {
+                    const newRow: Partial<Manuscript> = {};
+                    for (const key of headers) {
+                        if (row[key] !== undefined) {
+                            if (key === 'link_konten' && typeof row[key] === 'string') {
+                                newRow[key] = row[key].split(';').map((s: string) => s.trim());
+                            } else {
+                                newRow[key] = row[key];
+                            }
+                        }
+                    }
+                    return newRow;
+                });
 
-                const dbData = json_data.map(ms => ({
-                    title: ms.title, author: ms.author, inventory_code: ms.inventoryCode, digital_code: ms.digitalCode,
-                    status: ms.status, scribe: ms.scribe, copy_year: ms.copyYear ? parseInt(String(ms.copyYear), 10) : null,
-                    page_count: ms.pageCount ? parseInt(String(ms.pageCount), 10) : null, ink: ms.ink, category: ms.category,
-                    language: ms.language, script: ms.script, size: ms.size, description: ms.description,
-                    condition: ms.condition, readability: ms.readability, colophon: ms.colophon,
-                    thumbnail_url: ms.thumbnailUrl || (ms.imageUrls ? String(ms.imageUrls).split(';')[0].trim() : ''),
-                    image_urls: ms.imageUrls ? String(ms.imageUrls).split(';').map((url: string) => url.trim()).filter(Boolean) : []
-                }));
 
                 const { error: insertError } = await supabase.from('manuscripts').insert(dbData);
                 if (insertError) throw new Error(`Gagal menyimpan: ${insertError.message}`);
@@ -283,14 +373,14 @@ const DashboardView: React.FC<{ data: { manuscripts: Manuscript[], blogArticles:
             <Card title="Manuskrip Terbaru">
                 <ul className="divide-y divide-gray-200">
                     {data.manuscripts.slice(0, 5).map((ms) => (
-                        <li key={ms.id} className="py-2">{ms.title}</li>
+                        <li key={ms.id} className="py-2 truncate">{ms.judul_dari_tim}</li>
                     ))}
                 </ul>
             </Card>
             <Card title="Artikel Blog Terbaru">
                  <ul className="divide-y divide-gray-200">
                     {data.blogArticles.slice(0, 5).map((article) => (
-                        <li key={article.id} className="py-2">{article.title}</li>
+                        <li key={article.id} className="py-2 truncate">{article.title}</li>
                     ))}
                 </ul>
             </Card>
@@ -310,9 +400,9 @@ const ManuscriptView: React.FC<{
     const itemsPerPage = 10;
 
     const filteredManuscripts = useMemo(() => manuscripts.filter(ms => 
-        ms.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (ms.author && ms.author.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (ms.inventoryCode && ms.inventoryCode.toLowerCase().includes(searchQuery.toLowerCase()))
+        ms.judul_dari_tim.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (ms.pengarang && ms.pengarang.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (ms.kode_inventarisasi && ms.kode_inventarisasi.toLowerCase().includes(searchQuery.toLowerCase()))
     ), [manuscripts, searchQuery]);
 
     const paginatedManuscripts = useMemo(() => {
@@ -337,16 +427,16 @@ const ManuscriptView: React.FC<{
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left table-auto">
-                    <thead className="bg-gray-50"><tr className="border-b"><th className="p-3">Judul</th><th className="p-3 hidden sm:table-cell">Pengarang</th><th className="p-3 hidden md:table-cell">Kode</th><th className="p-3">Aksi</th></tr></thead>
+                    <thead className="bg-gray-50"><tr className="border-b"><th className="p-3">Judul</th><th className="p-3 hidden sm:table-cell">Pengarang</th><th className="p-3 hidden md:table-cell">Kode Inventarisasi</th><th className="p-3">Aksi</th></tr></thead>
                     <tbody className="divide-y divide-gray-200">
                         {paginatedManuscripts.length > 0 ? paginatedManuscripts.map(ms => (
                             <tr key={ms.id} className="hover:bg-gray-50">
-                                <td className="p-3 font-semibold">{ms.title}</td>
-                                <td className="p-3 hidden sm:table-cell">{ms.author}</td>
-                                <td className="p-3 hidden md:table-cell">{ms.inventoryCode}</td>
+                                <td className="p-3 font-semibold">{ms.judul_dari_tim}</td>
+                                <td className="p-3 hidden sm:table-cell">{ms.pengarang}</td>
+                                <td className="p-3 hidden md:table-cell">{ms.kode_inventarisasi}</td>
                                 <td className="p-3 space-x-3 whitespace-nowrap">
                                     <button onClick={() => onEdit(ms)} className="text-blue-600 hover:underline"><FaPen/></button>
-                                    <button onClick={() => onDelete(ms.id, ms.title)} className="text-red-600 hover:underline"><FaTrash/></button>
+                                    <button onClick={() => onDelete(ms.id, ms.judul_dari_tim)} className="text-red-600 hover:underline"><FaTrash/></button>
                                 </td>
                             </tr>
                         )) : (
@@ -526,9 +616,8 @@ const AdminPage: React.FC = () => {
         guestbook: 'Moderasi Buku Tamu'
     };
     
-    // ## INI BAGIAN YANG DIPERBAIKI ##
     const handleMenuClick = (e: React.MouseEvent<HTMLAnchorElement>, targetView: View) => {
-        e.preventDefault(); // Mencegah navigasi default
+        e.preventDefault();
         setView(targetView);
     };
 
