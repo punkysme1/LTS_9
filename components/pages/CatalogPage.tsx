@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient'
 import type { Manuscript } from '../types';
-import { Spinner } from '../components/UI';
+import { Spinner } from '../UI';
 
 const CategoryCounts: React.FC = () => {
     const [categories, setCategories] = useState<{ kategori_kailani: string; jumlah: number }[]>([]);

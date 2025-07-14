@@ -10,7 +10,7 @@ import { Button, Input, Select, Spinner } from '../UI';
 
 // --- TYPE DEFINITIONS ---
 type ManuscriptFormData = Omit<Manuscript, 'id' | 'created_at'>;
-type BlogArticleFormData = Omit<BlogArticle, 'id' | 'created_at' | 'publishDate' | 'snippet' | 'imageUrl'> & { imageUrl?: string };
+type BlogArticleFormData = Omit<BlogArticle, 'id' | 'created_at' | 'publishDate' | 'snippet'>;
 type View = 'dashboard' | 'manuscripts' | 'manuscript_form' | 'blog' | 'blog_form' | 'guestbook';
 
 // --- CONSTANTS & DEFAULTS ---
@@ -21,15 +21,15 @@ const emptyManuscript: ManuscriptFormData = {
   afiliasi: '', link_digital_afiliasi: '', nama_koleksi: '', nomor_digitalisasi: '', kode_inventarisasi: '',
   link_kover: '', link_konten: [], link_digital_tppkp: '', nomor_koleksi: '', judul_dari_afiliasi: '',
   halaman_pemisah: '', kategori_kailani: 'Keilmuan Islam Umum', kategori_ilmu_pesantren: '',
-  pengarang: '', penyalin: '', tahun_penulisan_teks: '', konversi_masehi: new Date().getFullYear(), lokasi_penyalinan: '', asal_usul_naskah: '',
+  pengarang: '', penyalin: '', tahun_penulisan_teks: '', konversi_masehi: undefined, lokasi_penyalinan: '', asal_usul_naskah: '',
   bahasa: '', aksara: '',
   watermark: '', countermark: '', kover: '', ukuran_kover: '', jilid: '', ukuran_kertas: '', ukuran_dimensi: '',
-  jumlah_halaman: 0, halaman_kosong: '', jumlah_baris_per_halaman: '', catatan_pinggir: false, catatan_makna: false,
+  jumlah_halaman: undefined, halaman_kosong: '', jumlah_baris_per_halaman: '', catatan_pinggir: false, catatan_makna: false,
   rubrikasi: false, iluminasi: false, ilustrasi: false, tinta: '',
   kondisi_fisik_naskah: '', keterbacaan: '', kelengkapan_naskah: '', kolofon: '', catatan_marginal: '', deskripsi_umum: '', catatan_catatan: ''
 };
 
-const emptyBlogArticle: Omit<BlogArticle, 'id' | 'created_at' | 'publishDate' | 'snippet'> = {
+const emptyBlogArticle: BlogArticleFormData = {
     title: '', author: '', content: '', imageUrl: ''
 };
 
@@ -76,8 +76,9 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             const { checked } = e.target as HTMLInputElement;
             setFormData(prev => ({ ...prev, [name]: checked }));
         } else {
-            const isNumber = ['konversi_masehi', 'jumlah_halaman'].includes(name) && value !== '';
-            setFormData(prev => ({ ...prev, [name]: isNumber ? parseInt(value, 10) : value }));
+            const isNumber = ['konversi_masehi', 'jumlah_halaman'].includes(name);
+            const val = isNumber && value === '' ? undefined : value;
+            setFormData(prev => ({ ...prev, [name]: isNumber && val !== undefined ? parseInt(val as string, 10) : val }));
         }
     };
     
@@ -93,8 +94,12 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             ? formData.link_konten.split(/[\n,]+/).map(url => url.trim()).filter(Boolean) 
             : [];
         
-        // Buat objek data yang bersih untuk dikirim
-        const dbData = { ...formData, link_konten: linkKontenArray };
+        const dbData = { 
+            ...formData, 
+            link_konten: linkKontenArray,
+            konversi_masehi: formData.konversi_masehi || null,
+            jumlah_halaman: formData.jumlah_halaman || null
+        };
 
         const { error } = manuscript
             ? await supabase.from('manuscripts').update(dbData).eq('id', manuscript.id)
@@ -118,16 +123,16 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
                     <input type="checkbox" id={name} {...commonProps} checked={!!formData[name]} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                     <label htmlFor={name} className="text-sm font-medium text-gray-700">{label}</label>
                 </div>
-            )
+            );
         }
 
         return (
              <div className="col-span-1">
                 <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                {type === 'input' && <Input {...commonProps} id={name} value={formData[name] as string || ''} placeholder={label} />}
-                {type === 'textarea' && <textarea {...commonProps} id={name} value={formData[name] as string || ''} placeholder={label} rows={3} className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>}
+                {type === 'input' && <Input {...commonProps} id={name} value={formData[name] ?? ''} placeholder={label} />}
+                {type === 'textarea' && <textarea {...commonProps} id={name} value={formData[name] as string ?? ''} placeholder={label} rows={3} className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>}
                 {type === 'select' && (
-                    <Select {...commonProps} id={name} value={formData[name] as string || ''}>
+                    <Select {...commonProps} id={name} value={formData[name] as string ?? ''}>
                         {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </Select>
                 )}
@@ -219,7 +224,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
 };
 
 const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCancel: () => void }> = ({ article, onSave, onCancel }) => {
-    const [formData, setFormData] = useState(article || emptyBlogArticle);
+    const [formData, setFormData] = useState<BlogArticleFormData>(article ? { ...article } : emptyBlogArticle);
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -231,7 +236,10 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
         setLoading(true);
 
         const dbData = {
-            ...formData,
+            title: formData.title,
+            author: formData.author,
+            content: formData.content,
+            image_url: formData.imageUrl,
             snippet: formData.content.substring(0, 150) + '...',
             publish_date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
         };
@@ -277,7 +285,7 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
         const worksheet = XLSX.utils.aoa_to_sheet([headers]);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
-        XLSX.writeFile(workbook, "template_manuskrip.xlsx");
+        XLSX.writeFile(workbook, "template_manuskrip_lengkap.xlsx");
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -304,11 +312,13 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
                 if (json_data.length === 0) throw new Error("File Excel kosong atau formatnya salah.");
                 
                 const dbData = json_data.map(row => {
-                    const newRow: Partial<Manuscript> = {};
+                    const newRow: { [key: string]: any } = {};
                     for (const key of headers) {
-                        if (row[key] !== undefined) {
-                            if (key === 'link_konten' && typeof row[key] === 'string') {
-                                newRow[key] = row[key].split(';').map((s: string) => s.trim());
+                        if (row[key] !== undefined && row[key] !== null) {
+                             if (key === 'link_konten' && typeof row[key] === 'string') {
+                                newRow[key] = row[key].split(';').map((s: string) => s.trim()).filter(Boolean);
+                            } else if (['catatan_pinggir', 'catatan_makna', 'rubrikasi', 'iluminasi', 'ilustrasi'].includes(key)) {
+                                newRow[key] = Boolean(row[key]);
                             } else {
                                 newRow[key] = row[key];
                             }
@@ -316,7 +326,6 @@ const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: 
                     }
                     return newRow;
                 });
-
 
                 const { error: insertError } = await supabase.from('manuscripts').insert(dbData);
                 if (insertError) throw new Error(`Gagal menyimpan: ${insertError.message}`);
@@ -550,7 +559,7 @@ const AdminPage: React.FC = () => {
             supabase.from('guestbook_entries').select('*').order('created_at', { ascending: false })
         ]);
 
-        if (msRes.data) setManuscripts(msRes.data);
+        if (msRes.data) setManuscripts(msRes.data as Manuscript[]);
         if (blogRes.data) setBlogArticles(blogRes.data);
         if (guestbookRes.data) setGuestbookEntries(guestbookRes.data);
         
@@ -587,7 +596,7 @@ const AdminPage: React.FC = () => {
         else fetchData();
     }
 
-     const renderContent = () => {
+    const renderContent = () => {
         if (loading) return <div className="flex justify-center p-20"><Spinner /></div>;
 
         switch(view) {

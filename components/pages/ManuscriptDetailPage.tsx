@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import type { Manuscript } from '../types';
-import { Spinner } from '../components/UI';
+import { Spinner } from '../UI';
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 
