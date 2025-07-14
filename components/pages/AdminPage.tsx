@@ -161,7 +161,6 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
     );
 };
 
-// ... (Komponen-komponen lain seperti BlogForm, MassUploadModal, dll. tidak berubah) ...
 const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCancel: () => void }> = ({ article, onSave, onCancel }) => {
     const [formData, setFormData] = useState<BlogArticleFormData>(article ? { ...article } : emptyBlogArticle);
     const [loading, setLoading] = useState(false);
@@ -186,11 +185,211 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
         </Card>
     );
 };
-const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: () => void }> = ({ isOpen, onClose, onSave }) => { /* ... (Tidak ada perubahan) ... */ return null };
-const DashboardView: React.FC<{ data: any }> = ({ data }) => { /* ... (Tidak ada perubahan) ... */ return null };
-const ManuscriptView: React.FC<{ manuscripts: Manuscript[], onEdit: (ms: Manuscript) => void, onDelete: (id: string, title: string) => void, onAddNew: () => void, onMassUpload: () => void }> = ({ manuscripts, onEdit, onDelete, onAddNew, onMassUpload }) => { /* ... (Tidak ada perubahan) ... */ return null };
-const GuestbookView: React.FC<{ entries: GuestbookEntry[], onToggleApproval: (entry: GuestbookEntry) => void, onDelete: (id: string, name: string) => void }> = ({ entries, onToggleApproval, onDelete }) => { /* ... (Tidak ada perubahan) ... */ return null };
 
+const MassUploadModal: React.FC<{ isOpen: boolean, onClose: () => void, onSave: () => void }> = ({ isOpen, onClose, onSave }) => {
+    const [file, setFile] = useState<File | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
+    const headers = Object.keys(emptyManuscript);
+    const handleDownloadTemplate = () => {
+        const worksheet = XLSX.utils.aoa_to_sheet([headers]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+        XLSX.writeFile(workbook, "template_manuskrip_lengkap.xlsx");
+    };
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) { setFile(e.target.files[0]); setError(null); setSuccess(null); } };
+    const handleUpload = () => {
+        if (!file) return setError("Silakan pilih file untuk diunggah.");
+        setLoading(true); setError(null); setSuccess(null);
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const data = event.target?.result;
+                const workbook = XLSX.read(data, { type: 'array' });
+                const json_data: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                if (json_data.length === 0) throw new Error("File Excel kosong atau formatnya salah.");
+                const dbData = json_data.map(row => {
+                    const newRow: { [key: string]: any } = {};
+                    for (const key of headers) {
+                        if (row[key] !== undefined && row[key] !== null) {
+                             if (key === 'link_konten' && typeof row[key] === 'string') { newRow[key] = row[key].split(';').map((s: string) => s.trim()).filter(Boolean); } else if (['catatan_pinggir', 'catatan_makna', 'rubrikasi', 'iluminasi', 'ilustrasi'].includes(key)) { newRow[key] = Boolean(row[key]); } else { newRow[key] = row[key]; }
+                        }
+                    }
+                    return newRow;
+                });
+                const { error: insertError } = await supabase.from('manuscripts').insert(dbData);
+                if (insertError) throw new Error(`Gagal menyimpan: ${insertError.message}`);
+                setSuccess(`${json_data.length} manuskrip berhasil diunggah.`);
+                onSave();
+                setTimeout(() => { onClose(); setFile(null); }, 2000);
+            } catch (e: any) {
+                setError(e.message || "Gagal memproses file Excel.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">Mass Upload Manuskrip (Excel)</h2>
+                <div className="space-y-4">
+                    <p className="text-gray-600">Gunakan template untuk menambahkan beberapa manuskrip sekaligus.</p>
+                    <Button type="button" variant="secondary" onClick={handleDownloadTemplate}><FaDownload className="mr-2"/> Unduh Template</Button>
+                    <div>
+                        <label htmlFor="xlsx-upload" className="block text-sm font-medium text-gray-700 mb-1">Pilih File (.xlsx)</label>
+                        <Input id="xlsx-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
+                    </div>
+                    {loading && <Spinner />}
+                    {error && <div className="text-red-600 bg-red-100 p-3 rounded-md">{error}</div>}
+                    {success && <div className="text-green-800 bg-green-100 p-3 rounded-md">{success}</div>}
+                </div>
+                <div className="flex justify-end space-x-4 mt-6 pt-4 border-t">
+                    <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>Tutup</Button>
+                    <Button type="button" onClick={handleUpload} disabled={loading || !file}><FaUpload className="mr-2"/> Unggah File</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- MAIN PAGE VIEWS ---
+const DashboardView: React.FC<{ data: { manuscripts: Manuscript[], blogArticles: BlogArticle[], guestbookEntries: GuestbookEntry[] } }> = ({ data }) => (
+    <section>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <InfoBox title="Total Manuskrip" value={data.manuscripts.length} icon={<FaBook />} color="bg-blue-500" />
+            <InfoBox title="Artikel Blog" value={data.blogArticles.length} icon={<FaNewspaper />} color="bg-green-500" />
+            <InfoBox title="Pesan Buku Tamu" value={data.guestbookEntries.length} icon={<FaComments />} color="bg-yellow-500" />
+            <InfoBox title="Menunggu Persetujuan" value={data.guestbookEntries.filter(e => !e.is_approved).length} icon={<FaComments />} color="bg-red-500" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card title="Manuskrip Terbaru">
+                <ul className="divide-y divide-gray-200">
+                    {data.manuscripts.slice(0, 5).map((ms) => (
+                        <li key={ms.id} className="py-2 truncate">{ms.judul_dari_tim}</li>
+                    ))}
+                </ul>
+            </Card>
+            <Card title="Artikel Blog Terbaru">
+                 <ul className="divide-y divide-gray-200">
+                    {data.blogArticles.slice(0, 5).map((article) => (
+                        <li key={article.id} className="py-2 truncate">{article.title}</li>
+                    ))}
+                </ul>
+            </Card>
+        </div>
+    </section>
+);
+
+const ManuscriptView: React.FC<{
+    manuscripts: Manuscript[];
+    onEdit: (ms: Manuscript) => void;
+    onDelete: (id: string, title: string) => void;
+    onAddNew: () => void;
+    onMassUpload: () => void;
+}> = ({ manuscripts, onEdit, onDelete, onAddNew, onMassUpload }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    const filteredManuscripts = useMemo(() => manuscripts.filter(ms => 
+        ms.judul_dari_tim.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (ms.pengarang && ms.pengarang.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (ms.kode_inventarisasi && ms.kode_inventarisasi.toLowerCase().includes(searchQuery.toLowerCase()))
+    ), [manuscripts, searchQuery]);
+
+    const paginatedManuscripts = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredManuscripts.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredManuscripts, currentPage, itemsPerPage]);
+
+    const totalPages = Math.ceil(filteredManuscripts.length / itemsPerPage);
+
+    return (
+        <Card 
+            title={`Total Manuskrip: ${filteredManuscripts.length}`}
+            actions={
+                <>
+                    <Button onClick={onMassUpload} variant="secondary"><FaUpload className="mr-2"/> Mass Upload</Button>
+                    <Button onClick={onAddNew}><FaPlus className="mr-2"/> Tambah Baru</Button>
+                </>
+            }
+        >
+            <div className="mb-4">
+                <Input type="text" placeholder="Cari berdasarkan Judul, Pengarang, Kode..." value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }} />
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left table-auto">
+                    <thead className="bg-gray-50"><tr className="border-b"><th className="p-3">Judul</th><th className="p-3 hidden sm:table-cell">Pengarang</th><th className="p-3 hidden md:table-cell">Kode Inventarisasi</th><th className="p-3">Aksi</th></tr></thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {paginatedManuscripts.length > 0 ? paginatedManuscripts.map(ms => (
+                            <tr key={ms.id} className="hover:bg-gray-50">
+                                <td className="p-3 font-semibold">{ms.judul_dari_tim}</td>
+                                <td className="p-3 hidden sm:table-cell">{ms.pengarang}</td>
+                                <td className="p-3 hidden md:table-cell">{ms.kode_inventarisasi}</td>
+                                <td className="p-3 space-x-3 whitespace-nowrap">
+                                    <button onClick={() => onEdit(ms)} className="text-blue-600 hover:underline"><FaPen/></button>
+                                    <button onClick={() => onDelete(ms.id, ms.judul_dari_tim)} className="text-red-600 hover:underline"><FaTrash/></button>
+                                </td>
+                            </tr>
+                        )) : (
+                            <tr><td colSpan={4} className="text-center p-8 text-gray-500">Tidak ada manuskrip yang cocok.</td></tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center mt-6">
+                    <span className="text-sm text-gray-700">Halaman {currentPage} dari {totalPages}</span>
+                    <div className="flex items-center space-x-2">
+                        <Button onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1} variant="secondary">Sebelumnya</Button>
+                        <Button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages} variant="secondary">Selanjutnya</Button>
+                    </div>
+                </div>
+            )}
+        </Card>
+    );
+};
+
+const GuestbookView: React.FC<{
+    entries: GuestbookEntry[];
+    onToggleApproval: (entry: GuestbookEntry) => void;
+    onDelete: (id: string, name: string) => void;
+}> = ({ entries, onToggleApproval, onDelete }) => {
+     return (
+        <Card title={`Moderasi Buku Tamu (${entries.length})`}>
+             <div className="overflow-x-auto">
+                 <table className="w-full text-left table-auto">
+                     <thead className="bg-gray-50"><tr className="border-b"><th className="p-3">Nama & Asal</th><th className="p-3">Pesan</th><th className="p-3">Status</th><th className="p-3">Aksi</th></tr></thead>
+                     <tbody className="divide-y divide-gray-200">
+                         {entries.map(entry => (
+                             <tr key={entry.id} className="hover:bg-gray-50">
+                                 <td className="p-3 align-top">
+                                    <span className="font-semibold">{entry.name}</span>
+                                    <br/>
+                                    <span className="text-sm text-gray-500">{entry.origin}</span>
+                                 </td>
+                                 <td className="p-3 text-sm align-top">{entry.message}</td>
+                                 <td className="p-3 align-top">
+                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${entry.is_approved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                        {entry.is_approved ? 'Disetujui' : 'Menunggu'}
+                                    </span>
+                                </td>
+                                 <td className="p-3 space-x-3 whitespace-nowrap align-top">
+                                     <button onClick={() => onToggleApproval(entry)} className="text-blue-600 hover:underline text-sm font-medium">{entry.is_approved ? 'Batalkan' : 'Setujui'}</button>
+                                     <button onClick={() => onDelete(entry.id, entry.name)} className="text-red-600 hover:underline text-sm font-medium">Hapus</button>
+                                 </td>
+                             </tr>
+                         ))}
+                     </tbody>
+                 </table>
+             </div>
+        </Card>
+    );
+};
 
 // --- MAIN ADMIN PAGE COMPONENT ---
 const AdminPage: React.FC = () => {
@@ -242,7 +441,7 @@ const AdminPage: React.FC = () => {
         const { error } = await supabase.from('guestbook_entries').update({ is_approved: !entry.is_approved }).eq('id', entry.id);
         if(error) alert('Gagal mengubah status: ' + error.message);
         else fetchData();
-    }
+    };
 
     const renderContent = () => {
         if (loading) return <div className="flex justify-center p-20"><Spinner /></div>;
@@ -261,8 +460,6 @@ const AdminPage: React.FC = () => {
             // setiap kali Anda mengetik satu huruf, yang menyebabkan input kehilangan
             // fokus dan kursor "meloncat". Ini adalah solusi standar dan paling
             // tepat untuk masalah ini di React.
-            //
-            // Pastikan baris ini ada di dalam kode Anda.
             // ========================================================================
             case 'manuscript_form':
                 return <ManuscriptForm key={editingManuscript?.id || 'new-manuscript'} manuscript={editingManuscript} onSave={handleSave} onCancel={handleCancel} />;
