@@ -1,130 +1,103 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ManuscriptCard, Input, Select, Button, Spinner } from '../UI';
-import { SearchIcon, ChevronLeftIcon, ChevronRightIcon } from '../Icons';
-import type { Manuscript } from '../../types';
-import { supabase } from '../../services/supabaseClient';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { supabase } from '../services/supabaseClient';
+import type { Manuscript } from '../types';
+import { Spinner } from '../components/UI';
 
-const ITEMS_PER_PAGE = 8;
+const CategoryCounts: React.FC = () => {
+    const [categories, setCategories] = useState<{ kategori_kailani: string; jumlah: number }[]>([]);
+    
+    useEffect(() => {
+        const fetchCounts = async () => {
+            const { data, error } = await supabase.rpc('get_kategori_kailani_counts');
+            if (error) {
+                console.error("Error fetching category counts:", error);
+            } else if (data) {
+                setCategories(data as any);
+            }
+        };
+        fetchCounts();
+    }, []);
+
+    if (!categories.length) return null;
+
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+            <h2 className="text-2xl font-bold font-serif text-brand-dark mb-4 text-center">Kategori</h2>
+            <div className="flex flex-wrap justify-center gap-3">
+                {categories.map(cat => (
+                    <div key={cat.kategori_kailani} className="bg-brand-light text-brand-dark px-3 py-1 rounded-full text-sm shadow-sm">
+                        <span className="font-semibold">{cat.kategori_kailani}</span>
+                        <span className="ml-2 bg-brand-accent text-white rounded-full px-2 py-0.5 text-xs font-bold">{cat.jumlah}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const ManuscriptCard: React.FC<{ manuscript: Partial<Manuscript> }> = ({ manuscript }) => (
+    <Link to={`/katalog/${manuscript.id}`} className="block group bg-white rounded-lg shadow-lg hover:shadow-2xl transition-shadow duration-300 overflow-hidden">
+        <div className="h-48 overflow-hidden bg-gray-200">
+            <img 
+                src={manuscript.link_kover || 'https://via.placeholder.com/400x300?text=Image+Not+Found'} 
+                alt={manuscript.judul_dari_tim} 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                loading="lazy"
+            />
+        </div>
+        <div className="p-4">
+            <h3 className="font-serif font-bold text-lg text-brand-dark truncate group-hover:text-brand-accent">{manuscript.judul_dari_tim}</h3>
+            <p className="text-sm text-gray-600 truncate">{manuscript.pengarang || 'Pengarang tidak diketahui'}</p>
+        </div>
+    </Link>
+);
+
 
 const CatalogPage: React.FC = () => {
-    const [allManuscripts, setAllManuscripts] = useState<Manuscript[]>([]);
+    const [manuscripts, setManuscripts] = useState<Partial<Manuscript>[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filters, setFilters] = useState({
-        category: 'All',
-        language: 'All',
-    });
-    const [currentPage, setCurrentPage] = useState(1);
-    
+
     useEffect(() => {
         const fetchManuscripts = async () => {
             setLoading(true);
             const { data, error } = await supabase
                 .from('manuscripts')
-                .select('*')
-                .order('title', { ascending: true });
-            
+                .select('id, judul_dari_tim, pengarang, link_kover')
+                .order('created_at', { ascending: false });
+
             if (error) {
-                console.error("Error fetching manuscripts", error);
+                console.error("Error fetching manuscripts:", error);
             } else {
-                const formattedData = data.map((item: any) => ({
-                    ...item,
-                    inventoryCode: item.inventory_code,
-                    digitalCode: item.digital_code,
-                    copyYear: item.copy_year,
-                    pageCount: item.page_count,
-                    thumbnailUrl: item.thumbnail_url,
-                    imageUrls: item.image_urls,
-                    googleDriveUrl: item.google_drive_url,
-                }));
-                setAllManuscripts(formattedData);
+                setManuscripts(data || []);
             }
             setLoading(false);
         };
         fetchManuscripts();
     }, []);
 
-    const uniqueCategories = ['All', ...Array.from(new Set(allManuscripts.map(m => m.category)))];
-    const uniqueLanguages = ['All', ...Array.from(new Set(allManuscripts.map(m => m.language)))];
-
-    const filteredManuscripts = useMemo(() => {
-        return allManuscripts
-            .filter(ms => {
-                const searchLower = searchQuery.toLowerCase();
-                return ms.title.toLowerCase().includes(searchLower) ||
-                       (ms.author && ms.author.toLowerCase().includes(searchLower)) ||
-                       (ms.inventoryCode && ms.inventoryCode.toLowerCase().includes(searchLower));
-            })
-            .filter(ms => filters.category === 'All' || ms.category === filters.category)
-            .filter(ms => filters.language === 'All' || ms.language === filters.language);
-    }, [searchQuery, filters, allManuscripts]);
-
-    const totalPages = Math.ceil(filteredManuscripts.length / ITEMS_PER_PAGE);
-    const paginatedManuscripts = filteredManuscripts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
-    const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFilters(prev => ({ ...prev, [name]: value }));
-        setCurrentPage(1);
-    };
-
-    const handlePageChange = (newPage: number) => {
-        if (newPage >= 1 && newPage <= totalPages) {
-            setCurrentPage(newPage);
-        }
-    };
-    
     return (
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="text-center mb-12">
-                <h1 className="font-serif text-4xl md:text-5xl font-bold text-brand-dark">Katalog Manuskrip</h1>
-                <p className="mt-2 text-lg text-gray-600">Jelajahi koleksi naskah kuno kami yang berharga.</p>
-            </div>
-            
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8 sticky top-20 z-30">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="relative lg:col-span-1">
-                        <Input 
-                            type="text" 
-                            placeholder="Cari berdasarkan Judul, Pengarang..." 
-                            value={searchQuery}
-                            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                            className="pl-10"
-                        />
-                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    </div>
-                     <Select name="category" value={filters.category} onChange={handleFilterChange}>
-                        {uniqueCategories.map(cat => <option key={cat} value={cat}>{cat === 'All' ? 'Semua Kategori' : cat}</option>)}
-                    </Select>
-                    <Select name="language" value={filters.language} onChange={handleFilterChange}>
-                        {uniqueLanguages.map(lang => <option key={lang} value={lang}>{lang === 'All' ? 'Semua Bahasa' : lang}</option>)}
-                    </Select>
+        <div className="bg-brand-light min-h-screen">
+            <div className="container mx-auto px-4 py-12">
+                <div className="text-center mb-12">
+                     <h1 className="text-4xl font-bold font-serif text-brand-dark">Katalog Manuskrip</h1>
+                     <p className="text-lg text-gray-600 mt-2">Jelajahi koleksi kekayaan intelektual kami</p>
                 </div>
-            </div>
 
-            {loading ? <Spinner /> : paginatedManuscripts.length > 0 ? (
-                <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-                        {paginatedManuscripts.map(ms => <ManuscriptCard key={ms.id} manuscript={ms} />)}
-                    </div>
-                    
-                    <div className="flex justify-center items-center mt-12 space-x-2">
-                        <Button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} variant="secondary" className="!px-4">
-                            <ChevronLeftIcon className="w-5 h-5" />
-                        </Button>
-                        <span className="text-gray-700">
-                            Halaman {currentPage} dari {totalPages}
-                        </span>
-                         <Button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} variant="secondary" className="!px-4">
-                            <ChevronRightIcon className="w-5 h-5" />
-                        </Button>
-                    </div>
-                </>
-            ) : (
-                <div className="text-center py-16 text-gray-500">
-                    <p className="text-xl">Tidak ada manuskrip yang cocok dengan kriteria Anda.</p>
+                <div className="mb-12">
+                     <CategoryCounts />
                 </div>
-            )}
+
+                {loading ? (
+                    <div className="flex justify-center py-20"><Spinner /></div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+                        {manuscripts.map(ms => (
+                            <ManuscriptCard key={ms.id} manuscript={ms} />
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

@@ -587,20 +587,27 @@ const AdminPage: React.FC = () => {
         else fetchData();
     }
 
-    const renderContent = () => {
+     const renderContent = () => {
         if (loading) return <div className="flex justify-center p-20"><Spinner /></div>;
 
         switch(view) {
             case 'manuscripts':
-                return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuscript_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuscript_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>
+                return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuscript_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuscript_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>;
+            
             case 'manuscript_form':
-                return <ManuscriptForm manuscript={editingManuscript} onSave={handleSave} onCancel={handleCancel} />;
+                // Memberikan 'key' yang stabil untuk mencegah re-render yang tidak perlu dan bug kursor
+                return <ManuscriptForm key={editingManuscript?.id || 'new-manuscript'} manuscript={editingManuscript} onSave={handleSave} onCancel={handleCancel} />;
+
             case 'blog':
-                return <BlogView articles={blogArticles} onAddNew={() => { setEditingBlogArticle(null); setView('blog_form'); }} onEdit={(article) => { setEditingBlogArticle(article); setView('blog_form');}} onDelete={(id, title) => handleDelete('blog_articles', id, title)} />
+                return <BlogView articles={blogArticles} onAddNew={() => { setEditingBlogArticle(null); setView('blog_form'); }} onEdit={(article) => { setEditingBlogArticle(article); setView('blog_form');}} onDelete={(id, title) => handleDelete('blog_articles', id, title)} />;
+            
             case 'blog_form':
-                return <BlogForm article={editingBlogArticle} onSave={handleSave} onCancel={handleCancel} />;
+                 // Memberikan 'key' yang stabil untuk form blog juga
+                return <BlogForm key={editingBlogArticle?.id || 'new-article'} article={editingBlogArticle} onSave={handleSave} onCancel={handleCancel} />;
+
             case 'guestbook':
                 return <GuestbookView entries={guestbookEntries} onToggleApproval={handleToggleGuestbookApproval} onDelete={(id, name) => handleDelete('guestbook_entries', id, name)} />;
+            
             case 'dashboard':
             default:
                 return <DashboardView data={{ manuscripts, blogArticles, guestbookEntries }} />;
