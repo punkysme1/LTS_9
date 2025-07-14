@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Manuscript, BlogArticle, GuestbookEntry } from '../../types';
+import type { Manuscript, BlogArticle, GuestbookEntry } from '../types';
 import { supabase } from '../../services/supabaseClient';
 import * as XLSX from 'xlsx';
 import { 
@@ -467,38 +467,6 @@ const ManuscriptView: React.FC<{
     );
 };
 
-const BlogView: React.FC<{
-    articles: BlogArticle[];
-    onEdit: (article: BlogArticle) => void;
-    onDelete: (id: string, title: string) => void;
-    onAddNew: () => void;
-}> = ({ articles, onEdit, onDelete, onAddNew }) => {
-    return (
-         <Card 
-            title={`Total Artikel: ${articles.length}`}
-            actions={<Button onClick={onAddNew}><FaPlus className="mr-2"/> Tulis Baru</Button>}
-        >
-            <div className="overflow-x-auto">
-                <table className="w-full text-left table-auto">
-                    <thead className="bg-gray-50"><tr className="border-b"><th className="p-3">Judul</th><th className="p-3 hidden sm:table-cell">Penulis</th><th className="p-3">Aksi</th></tr></thead>
-                    <tbody className="divide-y divide-gray-200">
-                        {articles.map(article => (
-                             <tr key={article.id} className="hover:bg-gray-50">
-                                <td className="p-3 font-semibold">{article.title}</td>
-                                <td className="p-3 hidden sm:table-cell">{article.author}</td>
-                                <td className="p-3 space-x-3 whitespace-nowrap">
-                                    <button onClick={() => onEdit(article)} className="text-blue-600 hover:underline"><FaPen/></button>
-                                    <button onClick={() => onDelete(article.id, article.title)} className="text-red-600 hover:underline"><FaTrash/></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </Card>
-    );
-};
-
 const GuestbookView: React.FC<{
     entries: GuestbookEntry[];
     onToggleApproval: (entry: GuestbookEntry) => void;
@@ -604,14 +572,12 @@ const AdminPage: React.FC = () => {
                 return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuscript_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuscript_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>;
             
             case 'manuscript_form':
-                // Memberikan 'key' yang stabil untuk mencegah re-render yang tidak perlu dan bug kursor
                 return <ManuscriptForm key={editingManuscript?.id || 'new-manuscript'} manuscript={editingManuscript} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'blog':
                 return <BlogView articles={blogArticles} onAddNew={() => { setEditingBlogArticle(null); setView('blog_form'); }} onEdit={(article) => { setEditingBlogArticle(article); setView('blog_form');}} onDelete={(id, title) => handleDelete('blog_articles', id, title)} />;
             
             case 'blog_form':
-                 // Memberikan 'key' yang stabil untuk form blog juga
                 return <BlogForm key={editingBlogArticle?.id || 'new-article'} article={editingBlogArticle} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'guestbook':
