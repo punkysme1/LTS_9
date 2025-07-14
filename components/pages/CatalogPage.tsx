@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '../../services/supabaseClient'
 import type { Manuscript } from '../types';
 import { Spinner } from '../components/UI';
 
