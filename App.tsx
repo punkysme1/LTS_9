@@ -12,6 +12,7 @@ import type { Session } from '@supabase/supabase-js';
 function App() {
   const [session, setSession] = useState<Session | null>(null);
 
+  // Mengambil sesi pengguna saat aplikasi dimuat dan memantau perubahan status autentikasi
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -23,14 +24,18 @@ function App() {
       setSession(session);
     });
 
+    // Membersihkan langganan saat komponen tidak lagi digunakan
     return () => subscription.unsubscribe();
   }, []);
 
+  // Menentukan apakah pengguna adalah admin (berdasarkan adanya sesi)
+  // Logika otorisasi lebih lanjut harus ditangani di dalam AdminPage
   const isAdmin = !!session;
 
   return (
     <Layout session={session}>
       <Routes>
+        {/* Rute publik yang selalu tersedia */}
         <Route path="/" element={<HomePage />} />
         <Route path="/katalog" element={<CatalogPage />} />
         <Route path="/katalog/:id" element={<ManuscriptDetailPage />} />
@@ -39,7 +44,11 @@ function App() {
         <Route path="/profil" element={<ProfilePage />} />
         <Route path="/kontak" element={<ContactPage />} />
         <Route path="/donasi" element={<DonationPage />} />
-        {isAdmin && <Route path="/admin" element={<AdminPage />} />}
+
+        {/* Rute admin: Sekarang selalu dirender.
+            Logika untuk memeriksa apakah pengguna benar-benar admin
+            dan mengalihkan jika tidak, harus ada di dalam komponen AdminPage. */}
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </Layout>
   );
