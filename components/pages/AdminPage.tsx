@@ -168,9 +168,30 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        const dbData = { title: formData.title, author: formData.author, content: formData.content, image_url: formData.imageUrl, snippet: formData.content.substring(0, 150) + '...', publish_date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), };
-        const { error } = article ? await supabase.from('blog_articles').update(dbData).eq('id', article.id) : await supabase.from('blog_articles').insert([dbData]);
-        if (error) { alert('Error saving article: ' + error.message); } else { alert(`Artikel "${formData.title}" berhasil disimpan.`); onSave(); }
+
+        // Perbaikan: Gunakan format ISO 8601 untuk publish_date
+        // Perbaikan: Gunakan 'imageUrl' agar sesuai dengan nama kolom di database Anda
+        const dbData = {
+            title: formData.title,
+            author: formData.author,
+            content: formData.content,
+            imageUrl: formData.imageUrl, // Diubah dari 'image_url' menjadi 'imageUrl'
+            snippet: formData.content.substring(0, 150) + '...',
+            publish_date: new Date().toISOString(), // Menggunakan ISO string untuk kompatibilitas DB
+        };
+
+        const { error } = article
+            ? await supabase.from('blog_articles').update(dbData).eq('id', article.id)
+            : await supabase.from('blog_articles').insert([dbData]);
+
+        if (error) {
+            // Tampilkan pesan error yang lebih detail dari Supabase
+            alert('Error saving article: ' + error.message + (error.details ? '\nDetails: ' + error.details : ''));
+            console.error('Supabase Error:', error); // Log error ke konsol untuk debugging lebih lanjut
+        } else {
+            alert(`Artikel "${formData.title}" berhasil disimpan.`);
+            onSave();
+        }
         setLoading(false);
     };
     return (
@@ -483,14 +504,14 @@ const AdminPage: React.FC = () => {
                 return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuscript_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuscript_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>;
 
             case 'manuscript_form':
-                // Removed key prop
+                // Pastikan TIDAK ADA prop 'key' di sini
                 return <ManuscriptForm manuscript={editingManuscript} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'blog':
                 return <BlogView articles={blogArticles} onAddNew={() => { setEditingBlogArticle(null); setView('blog_form'); }} onEdit={(article) => { setEditingBlogArticle(article); setView('blog_form');}} onDelete={(id, title) => handleDelete('blog_articles', id, title)} />;
 
             case 'blog_form':
-                // Removed key prop
+                // Pastikan TIDAK ADA prop 'key' di sini
                 return <BlogForm article={editingBlogArticle} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'guestbook':
