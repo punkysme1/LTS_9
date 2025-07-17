@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Manuscript, BlogArticle, GuestbookEntry } from '../types';
 import { supabase } from '../../services/supabaseClient';
 import * as XLSX from 'xlsx';
-import { 
-    FaTachometerAlt, FaBook, FaNewspaper, FaComments, FaUserCircle, 
-    FaBars, FaPlus, FaUpload, FaDownload, FaPen, FaTrash 
+import {
+    FaTachometerAlt, FaBook, FaNewspaper, FaComments, FaUserCircle,
+    FaBars, FaPlus, FaUpload, FaDownload, FaPen, FaTrash
 } from 'react-icons/fa';
 import { Button, Input, Select, Spinner } from '../UI';
 
@@ -71,7 +71,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
-        
+
         if (type === 'checkbox') {
             const { checked } = e.target as HTMLInputElement;
             setFormData(prev => ({ ...prev, [name]: checked }));
@@ -81,7 +81,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             setFormData(prev => ({ ...prev, [name]: isNumber && val !== undefined ? parseInt(val as string, 10) : val }));
         }
     };
-    
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.judul_dari_tim) {
@@ -90,12 +90,12 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
         }
         setLoading(true);
 
-        const linkKontenArray = typeof formData.link_konten === 'string' 
-            ? formData.link_konten.split(/[\n,]+/).map(url => url.trim()).filter(Boolean) 
+        const linkKontenArray = typeof formData.link_konten === 'string'
+            ? formData.link_konten.split(/[\n,]+/).map(url => url.trim()).filter(Boolean)
             : [];
-        
-        const dbData = { 
-            ...formData, 
+
+        const dbData = {
+            ...formData,
             link_konten: linkKontenArray,
             konversi_masehi: formData.konversi_masehi || null,
             jumlah_halaman: formData.jumlah_halaman || null
@@ -116,7 +116,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
 
     const renderField = (name: keyof ManuscriptFormData, label: string, type: 'input' | 'textarea' | 'select' | 'checkbox' = 'input', options: string[] = []) => {
         const commonProps = { name, onChange: handleChange, id: name };
-        
+
         if (type === 'checkbox') {
             return (
                 <div className="flex items-center gap-2 col-span-1 pt-2">
@@ -295,7 +295,7 @@ const ManuscriptView: React.FC<{
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    const filteredManuscripts = useMemo(() => manuscripts.filter(ms => 
+    const filteredManuscripts = useMemo(() => manuscripts.filter(ms =>
         ms.judul_dari_tim.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (ms.pengarang && ms.pengarang.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (ms.kode_inventarisasi && ms.kode_inventarisasi.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -309,7 +309,7 @@ const ManuscriptView: React.FC<{
     const totalPages = Math.ceil(filteredManuscripts.length / itemsPerPage);
 
     return (
-        <Card 
+        <Card
             title={`Total Manuskrip: ${filteredManuscripts.length}`}
             actions={
                 <>
@@ -361,7 +361,7 @@ const BlogView: React.FC<{
     onAddNew: () => void;
 }> = ({ articles, onEdit, onDelete, onAddNew }) => {
     return (
-         <Card 
+         <Card
             title={`Total Artikel: ${articles.length}`}
             actions={<Button onClick={onAddNew}><FaPlus className="mr-2"/> Tulis Baru</Button>}
         >
@@ -455,7 +455,7 @@ const AdminPage: React.FC = () => {
         if (view === 'manuscript_form') setView('manuscripts');
         if (view === 'blog_form') setView('blog');
     };
-    
+
     const handleCancel = () => {
         if (view === 'manuscript_form') setView('manuscripts');
         if (view === 'blog_form') setView('blog');
@@ -468,7 +468,7 @@ const AdminPage: React.FC = () => {
             else { alert(`"${name}" berhasil dihapus.`); fetchData(); }
         }
     };
-    
+
     const handleToggleGuestbookApproval = async (entry: GuestbookEntry) => {
         const { error } = await supabase.from('guestbook_entries').update({ is_approved: !entry.is_approved }).eq('id', entry.id);
         if(error) alert('Gagal mengubah status: ' + error.message);
@@ -481,19 +481,21 @@ const AdminPage: React.FC = () => {
         switch(view) {
             case 'manuscripts':
                 return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuscript_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuscript_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>;
-            
+
             case 'manuscript_form':
-                return <ManuscriptForm key={editingManuscript?.id || 'new-manuscript'} manuscript={editingManuscript} onSave={handleSave} onCancel={handleCancel} />;
+                // Removed key prop
+                return <ManuscriptForm manuscript={editingManuscript} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'blog':
                 return <BlogView articles={blogArticles} onAddNew={() => { setEditingBlogArticle(null); setView('blog_form'); }} onEdit={(article) => { setEditingBlogArticle(article); setView('blog_form');}} onDelete={(id, title) => handleDelete('blog_articles', id, title)} />;
-            
+
             case 'blog_form':
-                return <BlogForm key={editingBlogArticle?.id || 'new-article'} article={editingBlogArticle} onSave={handleSave} onCancel={handleCancel} />;
+                // Removed key prop
+                return <BlogForm article={editingBlogArticle} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'guestbook':
                 return <GuestbookView entries={guestbookEntries} onToggleApproval={handleToggleGuestbookApproval} onDelete={(id, name) => handleDelete('guestbook_entries', id, name)} />;
-            
+
             case 'dashboard':
             default:
                 return <DashboardView data={{ manuscripts, blogArticles, guestbookEntries }} />;
@@ -508,7 +510,7 @@ const AdminPage: React.FC = () => {
         blog_form: editingBlogArticle ? 'Edit Artikel' : 'Tulis Artikel',
         guestbook: 'Moderasi Buku Tamu'
     };
-    
+
     const handleMenuClick = (e: React.MouseEvent<HTMLAnchorElement>, targetView: View) => {
         e.preventDefault();
         setView(targetView);
