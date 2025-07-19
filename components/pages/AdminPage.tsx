@@ -6,6 +6,7 @@ import {
     FaTachometerAlt, FaBook, FaNewspaper, FaComments, FaUserCircle,
     FaBars, FaPlus, FaUpload, FaDownload, FaPen, FaTrash
 } from 'react-icons/fa';
+// Pastikan ini mengimpor komponen yang sudah di-memoize dari UI.tsx
 import { Button, Input, Select, Spinner } from '../UI';
 
 // --- TYPE DEFINITIONS ---
@@ -64,15 +65,16 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
         return {
             ...emptyManuscript,
             ...rest,
-            // Ensure link_konten is a string for the textarea
+            // Pastikan link_konten adalah string untuk textarea
             link_konten: Array.isArray(rest.link_konten) ? rest.link_konten.join('\n') : '',
-            // Ensure number fields are correctly set, handle null/undefined
+            // Pastikan nilai numerik diinisialisasi sebagai number atau undefined
             konversi_masehi: rest.konversi_masehi ?? undefined,
             jumlah_halaman: rest.jumlah_halaman ?? undefined,
         };
     });
     const [loading, setLoading] = useState(false);
 
+    // Menggunakan useCallback untuk handleChange untuk menghindari re-render Input
     const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
 
@@ -80,18 +82,16 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             if (type === 'checkbox') {
                 const { checked } = e.target as HTMLInputElement;
                 return { ...prev, [name]: checked };
+            } else if (['konversi_masehi', 'jumlah_halaman'].includes(name)) {
+                // Untuk input numerik, simpan sebagai number atau undefined jika kosong
+                const numericValue = value === '' ? undefined : parseInt(value, 10);
+                return { ...prev, [name]: numericValue };
             } else {
-                const isNumber = ['konversi_masehi', 'jumlah_halaman'].includes(name);
-                let val: string | number | boolean | undefined = value;
-
-                if (isNumber) {
-                    // Convert to number only if value is not empty, otherwise set to undefined (or null for DB)
-                    val = value === '' ? undefined : parseInt(value, 10);
-                }
-                return { ...prev, [name]: val };
+                // Untuk input teks, simpan sebagai string
+                return { ...prev, [name]: value };
             }
         });
-    }, []);
+    }, []); // Dependensi kosong karena tidak bergantung pada props atau state lain
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -105,12 +105,12 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             ? formData.link_konten.split(/[\n,]+/).map(url => url.trim()).filter(Boolean)
             : [];
 
-        // Prepare data for Supabase, ensuring undefined numbers become null
+        // Siapkan data untuk Supabase, pastikan undefined numbers menjadi null
         const dbData = {
             ...formData,
             link_konten: linkKontenArray,
-            konversi_masehi: formData.konversi_masehi ?? null, // Convert undefined to null for DB
-            jumlah_halaman: formData.jumlah_halaman ?? null // Convert undefined to null for DB
+            konversi_masehi: formData.konversi_masehi ?? null, // Konversi undefined ke null untuk DB
+            jumlah_halaman: formData.jumlah_halaman ?? null // Konversi undefined ke null untuk DB
         };
 
         const { error } = manuscript
@@ -119,7 +119,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
 
         if (error) {
             alert('Error: ' + error.message);
-            console.error('Supabase Error:', error); // Log error for debugging
+            console.error('Supabase Error:', error); // Log error untuk debugging
         } else {
             alert(`Manuskrip "${formData.judul_dari_tim}" berhasil disimpan.`);
             onSave();
@@ -128,6 +128,12 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
     };
 
     const renderField = (name: keyof ManuscriptFormData, label: string, type: 'input' | 'textarea' | 'select' | 'checkbox' = 'input', options: string[] = []) => {
+        // Pastikan nilai yang ditampilkan di input selalu string, bahkan untuk angka
+        const displayValue = (formData[name] ?? '').toString(); // Konversi ke string
+
+        // Tambahkan prop `type` untuk input numerik
+        const inputType = ['konversi_masehi', 'jumlah_halaman'].includes(name) ? 'number' : 'text';
+
         const commonProps = { name, onChange: handleChange, id: name };
 
         if (type === 'checkbox') {
@@ -139,16 +145,13 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             );
         }
 
-        // Ensure value for number inputs is string to prevent React warnings and control input
-        const displayValue = (formData[name] ?? '') as string | number;
-
         return (
              <div className="col-span-1">
                 <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                {type === 'input' && <Input {...commonProps} value={displayValue} placeholder={label} />}
-                {type === 'textarea' && <textarea {...commonProps} value={displayValue as string} placeholder={label} rows={3} className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>}
+                {type === 'input' && <Input {...commonProps} type={inputType} value={displayValue} placeholder={label} />}
+                {type === 'textarea' && <textarea {...commonProps} value={displayValue} placeholder={label} rows={3} className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>}
                 {type === 'select' && (
-                    <Select {...commonProps} value={displayValue as string}>
+                    <Select {...commonProps} value={displayValue}>
                         {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </Select>
                 )}
@@ -517,17 +520,17 @@ const AdminPage: React.FC = () => {
 
         switch(view) {
             case 'manuscripts':
-                return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuscript_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuscript_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>;
+                return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuskrip_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuskrip_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>;
 
             case 'manuscript_form':
-                // Removed the 'key' prop here to prevent unmounting/remounting
+                // Pastikan TIDAK ADA prop 'key' di sini, agar komponen tidak di-unmount/remount
                 return <ManuscriptForm manuscript={editingManuscript} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'blog':
                 return <BlogView articles={blogArticles} onAddNew={() => { setEditingBlogArticle(null); setView('blog_form'); }} onEdit={(article) => { setEditingBlogArticle(article); setView('blog_form');}} onDelete={(id, title) => handleDelete('blog_articles', id, title)} />;
 
             case 'blog_form':
-                // Removed the 'key' prop here to prevent unmounting/remounting
+                // Pastikan TIDAK ADA prop 'key' di sini, agar komponen tidak di-unmount/remount
                 return <BlogForm article={editingBlogArticle} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'guestbook':
