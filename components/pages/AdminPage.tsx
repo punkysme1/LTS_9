@@ -59,43 +59,56 @@ const InfoBox: React.FC<{ title: string; value: string | number; icon: React.Rea
 
 // --- FORM COMPONENTS ---
 const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => void, onCancel: () => void }> = ({ manuscript, onSave, onCancel }) => {
+    // Debugging: Log saat ManuscriptForm di-render
+    console.log('ManuscriptForm Rendered', { manuscriptId: manuscript?.id, viewState: 'manuscript_form' });
+
     const [formData, setFormData] = useState<ManuscriptFormData>(() => {
+        // Debugging: Log inisialisasi state
+        console.log('Initializing ManuscriptForm State with manuscript:', manuscript);
         if (!manuscript) return emptyManuscript;
         const { id, created_at, ...rest } = manuscript;
         return {
             ...emptyManuscript,
             ...rest,
-            // Pastikan link_konten adalah string untuk textarea
             link_konten: Array.isArray(rest.link_konten) ? rest.link_konten.join('\n') : '',
-            // Pastikan nilai numerik diinisialisasi sebagai number atau undefined
             konversi_masehi: rest.konversi_masehi ?? undefined,
             jumlah_halaman: rest.jumlah_halaman ?? undefined,
         };
     });
     const [loading, setLoading] = useState(false);
 
-    // Menggunakan useCallback untuk handleChange untuk menghindari re-render Input
+    // Gunakan useEffect untuk melacak perubahan formData (opsional untuk debugging mendalam)
+    // useEffect(() => {
+    //     console.log('formData updated:', formData);
+    // }, [formData]);
+
     const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
+        // Debugging: Log setiap kali handleChange dipanggil
+        console.log(`handleChange called for ${name}. New value: "${value}", type: "${type}"`);
 
         setFormData(prev => {
+            let updatedValue: any;
             if (type === 'checkbox') {
-                const { checked } = e.target as HTMLInputElement;
-                return { ...prev, [name]: checked };
+                updatedValue = (e.target as HTMLInputElement).checked;
             } else if (['konversi_masehi', 'jumlah_halaman'].includes(name)) {
-                // Untuk input numerik, simpan sebagai number atau undefined jika kosong
-                const numericValue = value === '' ? undefined : parseInt(value, 10);
-                // Pastikan NaN tidak disimpan, kembalikan undefined jika parseInt gagal
-                return { ...prev, [name]: isNaN(numericValue as number) ? undefined : numericValue };
+                updatedValue = value === '' ? undefined : parseInt(value, 10);
+                if (isNaN(updatedValue)) updatedValue = undefined; // Pastikan NaN tidak disimpan
             } else {
-                // Untuk input teks, simpan sebagai string
-                return { ...prev, [name]: value };
+                updatedValue = value;
             }
+
+            // Debugging: Log perubahan state yang akan dilakukan
+            // console.log(`Updating ${name} from "${prev[name as keyof ManuscriptFormData]}" to "${updatedValue}"`);
+            return { ...prev, [name]: updatedValue };
         });
-    }, []); // Dependensi kosong karena tidak bergantung pada props atau state lain
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        // Debugging: Log saat submit
+        console.log('Form submitted. Current formData:', formData);
+
         if (!formData.judul_dari_tim) {
             alert("Judul Dari Tim wajib diisi.");
             return;
@@ -106,12 +119,11 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             ? formData.link_konten.split(/[\n,]+/).map(url => url.trim()).filter(Boolean)
             : [];
 
-        // Siapkan data untuk Supabase, pastikan undefined numbers menjadi null
         const dbData = {
             ...formData,
             link_konten: linkKontenArray,
-            konversi_masehi: formData.konversi_masehi ?? null, // Konversi undefined ke null untuk DB
-            jumlah_halaman: formData.jumlah_halaman ?? null // Konversi undefined ke null untuk DB
+            konversi_masehi: formData.konversi_masehi ?? null,
+            jumlah_halaman: formData.jumlah_halaman ?? null
         };
 
         const { error } = manuscript
@@ -120,7 +132,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
 
         if (error) {
             alert('Error: ' + error.message);
-            console.error('Supabase Error:', error); // Log error untuk debugging
+            console.error('Supabase Error:', error);
         } else {
             alert(`Manuskrip "${formData.judul_dari_tim}" berhasil disimpan.`);
             onSave();
@@ -129,17 +141,25 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
     };
 
     const renderField = (name: keyof ManuscriptFormData, label: string, type: 'input' | 'textarea' | 'select' | 'checkbox' = 'input', options: string[] = []) => {
-        // Pastikan nilai yang ditampilkan di input selalu string, bahkan untuk angka
-        const displayValue = (formData[name] ?? '').toString(); // Konversi ke string
+        // Pastikan nilai yang ditampilkan di input selalu string
+        const displayValue = (formData[name] ?? '').toString();
 
-        // Tambahkan prop `type` untuk input numerik
         const inputType = ['konversi_masehi', 'jumlah_halaman'].includes(name) ? 'number' : 'text';
 
-        const commonProps = { name, onChange: handleChange, id: name };
+        const commonProps = {
+            name,
+            onChange: handleChange,
+            id: name,
+            value: displayValue, // Nilai kontrol
+            placeholder: label,
+            // Debugging: Tambahkan key unik untuk setiap input
+            // Ini adalah langkah darurat jika React kehilangan elemen DOM-nya
+            key: `manuscript-input-${name}` // Ini akan memastikan setiap input memiliki key yang stabil
+        };
 
         if (type === 'checkbox') {
             return (
-                <div className="flex items-center gap-2 col-span-1 pt-2">
+                <div className="flex items-center gap-2 col-span-1 pt-2" key={`div-${name}`}>
                     <input type="checkbox" {...commonProps} checked={!!formData[name]} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                     <label htmlFor={name} className="text-sm font-medium text-gray-700">{label}</label>
                 </div>
@@ -147,12 +167,12 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
         }
 
         return (
-             <div className="col-span-1">
+             <div className="col-span-1" key={`div-${name}`}>
                 <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                {type === 'input' && <Input {...commonProps} type={inputType} value={displayValue} placeholder={label} />}
-                {type === 'textarea' && <textarea {...commonProps} value={displayValue} placeholder={label} rows={3} className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>}
+                {type === 'input' && <Input {...commonProps} type={inputType} />}
+                {type === 'textarea' && <textarea {...commonProps} rows={3} className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>}
                 {type === 'select' && (
-                    <Select {...commonProps} value={displayValue}>
+                    <Select {...commonProps}>
                         {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </Select>
                 )}
@@ -172,7 +192,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             <FormSection title="Identitas & Afiliasi">{renderField('judul_dari_tim', 'Judul Dari Tim (Wajib)')}{renderField('judul_dari_afiliasi', 'Judul Dari Afiliasi')}{renderField('afiliasi', 'Afiliasi')}{renderField('link_digital_afiliasi', 'Link Digital Afiliasi')}{renderField('nama_koleksi', 'Nama Koleksi')}{renderField('nomor_koleksi', 'Nomor Koleksi')}{renderField('nomor_digitalisasi', 'Nomor Digitalisasi')}{renderField('kode_inventarisasi', 'Kode Inventarisasi')}{renderField('link_digital_tppkp', 'Link Digital TPPKP Qomaruddin')}</FormSection>
             <FormSection title="Link Gambar">{renderField('link_kover', 'Link Kover (Thumbnail)')}{renderField('link_konten', 'Link Konten (URL per baris)', 'textarea')}</FormSection>
             <FormSection title="Klasifikasi & Kepengarangan">{renderField('kategori_kailani', 'Klasifikasi (Kailani)', 'select', KATEGORI_KAILANI_OPTIONS)}{renderField('kategori_ilmu_pesantren', 'Kategori Ilmu Pesantren')}{renderField('pengarang', 'Pengarang')}{renderField('penyalin', 'Penyalin')}{renderField('tahun_penulisan_teks', 'Tahun Penulisan di Teks')}{renderField('konversi_masehi', 'Konversi Masehi', 'input')}{renderField('lokasi_penyalinan', 'Lokasi Penyalinan')}{renderField('asal_usul_naskah', 'Asal Usul Naskah')}{renderField('bahasa', 'Bahasa')}{renderField('aksara', 'Aksara')}</FormSection>
-            <FormSection title="Data Fisik Naskah">{renderField('kover', 'Kover')}{renderField('jilid', 'Jilid')}{renderField('ukuran_kover', 'Ukuran Kover')}{renderField('ukuran_kertas', 'Ukuran Kertas')}{renderField('ukuran_dimensi', 'Ukuran Dimensi')}{renderField('watermark', 'Watermark')}{renderField('countermark', 'Countermark')}{renderField('tinta', 'Tinta')}{renderField('jumlah_halaman', 'Jumlah Halaman', 'input')}{renderField('halaman_kosong', 'Halaman Kosong')}{renderField('jumlah_baris_per_halaman', 'Jumlah Baris Per Halaman')}{renderField('halaman_pemisah', 'Halaman Pemisah')}</FormSection>
+            <FormSection title="Data Fisik Naskah">{renderField('kover', 'Kover')}{renderField('jilid', 'Jilid')}{renderField('ukuran_kover', 'Ukuran Kover')}{renderField('jilid', 'Jilid')}{renderField('ukuran_kover', 'Ukuran Kover')}{renderField('ukuran_kertas', 'Ukuran Kertas')}{renderField('ukuran_dimensi', 'Ukuran Dimensi')}{renderField('watermark', 'Watermark')}{renderField('countermark', 'Countermark')}{renderField('tinta', 'Tinta')}{renderField('jumlah_halaman', 'Jumlah Halaman', 'input')}{renderField('halaman_kosong', 'Halaman Kosong')}{renderField('jumlah_baris_per_halaman', 'Jumlah Baris Per Halaman')}{renderField('halaman_pemisah', 'Halaman Pemisah')}</FormSection>
             <FormSection title="Seni & Rubrikasi">{renderField('rubrikasi', 'Rubrikasi', 'checkbox')}{renderField('iluminasi', 'Iluminasi', 'checkbox')}{renderField('ilustrasi', 'Ilustrasi', 'checkbox')}</FormSection>
             <FormSection title="Catatan Teks & Kondisi">{renderField('catatan_pinggir', 'Catatan Pinggir', 'checkbox')}{renderField('catatan_makna', 'Catatan Makna', 'checkbox')}{renderField('catatan_marginal', 'Catatan Marginal (Koreksi, Komentar)', 'textarea')}{renderField('kondisi_fisik_naskah', 'Kondisi Fisik Naskah', 'textarea')}{renderField('keterbacaan', 'Keterbacaan')}{renderField('kelengkapan_naskah', 'Kelengkapan Naskah')}{renderField('kolofon', 'Kolofon', 'textarea')}</FormSection>
             <FormSection title="Deskripsi & Catatan Umum">{renderField('deskripsi_umum', 'Deskripsi Umum', 'textarea')}{renderField('catatan_catatan', 'Catatan-catatan', 'textarea')}</FormSection>
@@ -189,15 +209,13 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
         e.preventDefault();
         setLoading(true);
 
-        // Perbaikan: Gunakan format ISO 8601 untuk publish_date
-        // Perbaikan: Gunakan 'imageUrl' agar sesuai dengan nama kolom di database Anda
         const dbData = {
             title: formData.title,
             author: formData.author,
             content: formData.content,
-            imageUrl: formData.imageUrl, // Diubah dari 'image_url' menjadi 'imageUrl'
+            imageUrl: formData.imageUrl,
             snippet: formData.content.substring(0, 150) + '...',
-            publish_date: new Date().toISOString(), // Menggunakan ISO string untuk kompatibilitas DB
+            publish_date: new Date().toISOString(),
         };
 
         const { error } = article
@@ -205,9 +223,8 @@ const BlogForm: React.FC<{ article: BlogArticle | null, onSave: () => void, onCa
             : await supabase.from('blog_articles').insert([dbData]);
 
         if (error) {
-            // Tampilkan pesan error yang lebih detail dari Supabase
             alert('Error saving article: ' + error.message + (error.details ? '\nDetails: ' + error.details : ''));
-            console.error('Supabase Error:', error); // Log error ke konsol untuk debugging lebih lanjut
+            console.error('Supabase Error:', error);
         } else {
             alert(`Artikel "${formData.title}" berhasil disimpan.`);
             onSave();
@@ -493,26 +510,24 @@ const AdminPage: React.FC = () => {
 
     const handleSave = () => {
         fetchData();
-        // Setelah menyimpan, kembali ke tampilan daftar
         if (view === 'manuscript_form') {
             setView('manuscripts');
-            setEditingManuscript(null); // Reset editingManuscript setelah disimpan
+            setEditingManuscript(null);
         }
         if (view === 'blog_form') {
             setView('blog');
-            setEditingBlogArticle(null); // Reset editingBlogArticle setelah disimpan
+            setEditingBlogArticle(null);
         }
     };
 
     const handleCancel = () => {
-        // Saat dibatalkan, kembali ke tampilan daftar
         if (view === 'manuscript_form') {
             setView('manuscripts');
-            setEditingManuscript(null); // Reset editingManuscript saat dibatalkan
+            setEditingManuscript(null);
         }
         if (view === 'blog_form') {
             setView('blog');
-            setEditingBlogArticle(null); // Reset editingBlogArticle saat dibatalkan
+            setEditingBlogArticle(null);
         }
     };
 
@@ -535,18 +550,15 @@ const AdminPage: React.FC = () => {
 
         switch(view) {
             case 'manuscripts':
-                // Perbaiki nama view dari 'manuskrip_form' menjadi 'manuscript_form'
                 return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuscript_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuscript_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>;
 
             case 'manuscript_form':
-                // Pastikan TIDAK ADA prop 'key' di sini, agar komponen tidak di-unmount/remount
                 return <ManuscriptForm manuscript={editingManuscript} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'blog':
                 return <BlogView articles={blogArticles} onAddNew={() => { setEditingBlogArticle(null); setView('blog_form'); }} onEdit={(article) => { setEditingBlogArticle(article); setView('blog_form');}} onDelete={(id, title) => handleDelete('blog_articles', id, title)} />;
 
             case 'blog_form':
-                // Pastikan TIDAK ADA prop 'key' di sini, agar komponen tidak di-unmount/remount
                 return <BlogForm article={editingBlogArticle} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'guestbook':
@@ -570,7 +582,6 @@ const AdminPage: React.FC = () => {
     const handleMenuClick = (e: React.MouseEvent<HTMLAnchorElement>, targetView: View) => {
         e.preventDefault();
         setView(targetView);
-        // Reset editing state saat berganti view
         setEditingManuscript(null);
         setEditingBlogArticle(null);
     };
