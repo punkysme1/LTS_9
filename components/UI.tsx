@@ -13,10 +13,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 export const Button: React.FC<ButtonProps> = ({ children, className, variant = 'primary', ...props }) => {
   const baseClasses = 'px-6 py-2 rounded-md font-semibold transition-all duration-300 transform hover:scale-105 shadow-md';
-  const variantClasses = variant === 'primary' 
+  const variantClasses = variant === 'primary'
     ? 'bg-brand-accent text-brand-dark hover:bg-brand-accent-dark'
     : 'bg-gray-200 text-brand-dark hover:bg-gray-300';
-  
+
   return (
     <button className={`${baseClasses} ${variantClasses} ${className}`} {...props}>
       {children}
@@ -32,10 +32,10 @@ interface CardProps {
 export const ManuscriptCard: React.FC<CardProps> = ({ manuscript }) => (
     <NavLink to={`/katalog/${manuscript.id}`} className="block bg-white rounded-lg shadow-lg overflow-hidden group transform hover:-translate-y-2 transition-transform duration-300">
         <div className="relative h-64 bg-gray-200">
-            <img 
-              src={manuscript.link_kover || 'https://via.placeholder.com/400x300?text=No+Image'} 
-              alt={manuscript.judul_dari_tim || 'Manuskrip'} 
-              className="w-full h-full object-cover" 
+            <img
+              src={manuscript.link_kover || 'https://via.placeholder.com/400x300?text=No+Image'}
+              alt={manuscript.judul_dari_tim || 'Manuskrip'}
+              className="w-full h-full object-cover"
               loading="lazy"
             />
             <div className="absolute inset-0 bg-black bg-opacity-20 group-hover:bg-opacity-40 transition-all duration-300"></div>
@@ -49,15 +49,17 @@ export const ManuscriptCard: React.FC<CardProps> = ({ manuscript }) => (
 );
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
-export const Input: React.FC<InputProps> = ({ className, ...props }) => (
+// Memperbaiki: Menggunakan React.memo untuk mencegah re-render yang tidak perlu dan mempertahankan fokus kursor
+export const Input = React.memo<InputProps>(({ className, ...props }) => (
   <input className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-accent focus:border-transparent outline-none transition ${className}`} {...props} />
-);
+));
 
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
     children: React.ReactNode;
 }
-export const Select: React.FC<SelectProps> = ({ className, children, ...props }) => (
+// Memperbaiki: Menggunakan React.memo untuk mencegah re-render yang tidak perlu dan mempertahankan fokus kursor
+export const Select = React.memo<SelectProps>(({ className, children, ...props }) => (
   <select className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-accent focus:border-transparent outline-none transition bg-white ${className}`} {...props}>
     {children}
   </select>
-);
+));
