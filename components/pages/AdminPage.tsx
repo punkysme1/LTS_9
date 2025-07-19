@@ -64,23 +64,34 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
         return {
             ...emptyManuscript,
             ...rest,
+            // Ensure link_konten is a string for the textarea
             link_konten: Array.isArray(rest.link_konten) ? rest.link_konten.join('\n') : '',
+            // Ensure number fields are correctly set, handle null/undefined
+            konversi_masehi: rest.konversi_masehi ?? undefined,
+            jumlah_halaman: rest.jumlah_halaman ?? undefined,
         };
     });
     const [loading, setLoading] = useState(false);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
 
-        if (type === 'checkbox') {
-            const { checked } = e.target as HTMLInputElement;
-            setFormData(prev => ({ ...prev, [name]: checked }));
-        } else {
-            const isNumber = ['konversi_masehi', 'jumlah_halaman'].includes(name);
-            const val = isNumber && value === '' ? undefined : value;
-            setFormData(prev => ({ ...prev, [name]: isNumber && val !== undefined ? parseInt(val as string, 10) : val }));
-        }
-    };
+        setFormData(prev => {
+            if (type === 'checkbox') {
+                const { checked } = e.target as HTMLInputElement;
+                return { ...prev, [name]: checked };
+            } else {
+                const isNumber = ['konversi_masehi', 'jumlah_halaman'].includes(name);
+                let val: string | number | boolean | undefined = value;
+
+                if (isNumber) {
+                    // Convert to number only if value is not empty, otherwise set to undefined (or null for DB)
+                    val = value === '' ? undefined : parseInt(value, 10);
+                }
+                return { ...prev, [name]: val };
+            }
+        });
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -94,11 +105,12 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             ? formData.link_konten.split(/[\n,]+/).map(url => url.trim()).filter(Boolean)
             : [];
 
+        // Prepare data for Supabase, ensuring undefined numbers become null
         const dbData = {
             ...formData,
             link_konten: linkKontenArray,
-            konversi_masehi: formData.konversi_masehi || null,
-            jumlah_halaman: formData.jumlah_halaman || null
+            konversi_masehi: formData.konversi_masehi ?? null, // Convert undefined to null for DB
+            jumlah_halaman: formData.jumlah_halaman ?? null // Convert undefined to null for DB
         };
 
         const { error } = manuscript
@@ -107,6 +119,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
 
         if (error) {
             alert('Error: ' + error.message);
+            console.error('Supabase Error:', error); // Log error for debugging
         } else {
             alert(`Manuskrip "${formData.judul_dari_tim}" berhasil disimpan.`);
             onSave();
@@ -126,13 +139,16 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             );
         }
 
+        // Ensure value for number inputs is string to prevent React warnings and control input
+        const displayValue = (formData[name] ?? '') as string | number;
+
         return (
              <div className="col-span-1">
                 <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                {type === 'input' && <Input {...commonProps} value={formData[name] ?? ''} placeholder={label} />}
-                {type === 'textarea' && <textarea {...commonProps} value={formData[name] as string ?? ''} placeholder={label} rows={3} className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>}
+                {type === 'input' && <Input {...commonProps} value={displayValue} placeholder={label} />}
+                {type === 'textarea' && <textarea {...commonProps} value={displayValue as string} placeholder={label} rows={3} className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>}
                 {type === 'select' && (
-                    <Select {...commonProps} value={formData[name] as string ?? ''}>
+                    <Select {...commonProps} value={displayValue as string}>
                         {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </Select>
                 )}
@@ -151,8 +167,8 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
         <form onSubmit={handleSubmit} className="space-y-8">
             <FormSection title="Identitas & Afiliasi">{renderField('judul_dari_tim', 'Judul Dari Tim (Wajib)')}{renderField('judul_dari_afiliasi', 'Judul Dari Afiliasi')}{renderField('afiliasi', 'Afiliasi')}{renderField('link_digital_afiliasi', 'Link Digital Afiliasi')}{renderField('nama_koleksi', 'Nama Koleksi')}{renderField('nomor_koleksi', 'Nomor Koleksi')}{renderField('nomor_digitalisasi', 'Nomor Digitalisasi')}{renderField('kode_inventarisasi', 'Kode Inventarisasi')}{renderField('link_digital_tppkp', 'Link Digital TPPKP Qomaruddin')}</FormSection>
             <FormSection title="Link Gambar">{renderField('link_kover', 'Link Kover (Thumbnail)')}{renderField('link_konten', 'Link Konten (URL per baris)', 'textarea')}</FormSection>
-            <FormSection title="Klasifikasi & Kepengarangan">{renderField('kategori_kailani', 'Klasifikasi (Kailani)', 'select', KATEGORI_KAILANI_OPTIONS)}{renderField('kategori_ilmu_pesantren', 'Kategori Ilmu Pesantren')}{renderField('pengarang', 'Pengarang')}{renderField('penyalin', 'Penyalin')}{renderField('tahun_penulisan_teks', 'Tahun Penulisan di Teks')}{renderField('konversi_masehi', 'Konversi Masehi')}{renderField('lokasi_penyalinan', 'Lokasi Penyalinan')}{renderField('asal_usul_naskah', 'Asal Usul Naskah')}{renderField('bahasa', 'Bahasa')}{renderField('aksara', 'Aksara')}</FormSection>
-            <FormSection title="Data Fisik Naskah">{renderField('kover', 'Kover')}{renderField('jilid', 'Jilid')}{renderField('ukuran_kover', 'Ukuran Kover')}{renderField('ukuran_kertas', 'Ukuran Kertas')}{renderField('ukuran_dimensi', 'Ukuran Dimensi')}{renderField('watermark', 'Watermark')}{renderField('countermark', 'Countermark')}{renderField('tinta', 'Tinta')}{renderField('jumlah_halaman', 'Jumlah Halaman')}{renderField('halaman_kosong', 'Halaman Kosong')}{renderField('jumlah_baris_per_halaman', 'Jumlah Baris Per Halaman')}{renderField('halaman_pemisah', 'Halaman Pemisah')}</FormSection>
+            <FormSection title="Klasifikasi & Kepengarangan">{renderField('kategori_kailani', 'Klasifikasi (Kailani)', 'select', KATEGORI_KAILANI_OPTIONS)}{renderField('kategori_ilmu_pesantren', 'Kategori Ilmu Pesantren')}{renderField('pengarang', 'Pengarang')}{renderField('penyalin', 'Penyalin')}{renderField('tahun_penulisan_teks', 'Tahun Penulisan di Teks')}{renderField('konversi_masehi', 'Konversi Masehi', 'input')}{renderField('lokasi_penyalinan', 'Lokasi Penyalinan')}{renderField('asal_usul_naskah', 'Asal Usul Naskah')}{renderField('bahasa', 'Bahasa')}{renderField('aksara', 'Aksara')}</FormSection>
+            <FormSection title="Data Fisik Naskah">{renderField('kover', 'Kover')}{renderField('jilid', 'Jilid')}{renderField('ukuran_kover', 'Ukuran Kover')}{renderField('ukuran_kertas', 'Ukuran Kertas')}{renderField('ukuran_dimensi', 'Ukuran Dimensi')}{renderField('watermark', 'Watermark')}{renderField('countermark', 'Countermark')}{renderField('tinta', 'Tinta')}{renderField('jumlah_halaman', 'Jumlah Halaman', 'input')}{renderField('halaman_kosong', 'Halaman Kosong')}{renderField('jumlah_baris_per_halaman', 'Jumlah Baris Per Halaman')}{renderField('halaman_pemisah', 'Halaman Pemisah')}</FormSection>
             <FormSection title="Seni & Rubrikasi">{renderField('rubrikasi', 'Rubrikasi', 'checkbox')}{renderField('iluminasi', 'Iluminasi', 'checkbox')}{renderField('ilustrasi', 'Ilustrasi', 'checkbox')}</FormSection>
             <FormSection title="Catatan Teks & Kondisi">{renderField('catatan_pinggir', 'Catatan Pinggir', 'checkbox')}{renderField('catatan_makna', 'Catatan Makna', 'checkbox')}{renderField('catatan_marginal', 'Catatan Marginal (Koreksi, Komentar)', 'textarea')}{renderField('kondisi_fisik_naskah', 'Kondisi Fisik Naskah', 'textarea')}{renderField('keterbacaan', 'Keterbacaan')}{renderField('kelengkapan_naskah', 'Kelengkapan Naskah')}{renderField('kolofon', 'Kolofon', 'textarea')}</FormSection>
             <FormSection title="Deskripsi & Catatan Umum">{renderField('deskripsi_umum', 'Deskripsi Umum', 'textarea')}{renderField('catatan_catatan', 'Catatan-catatan', 'textarea')}</FormSection>
@@ -504,14 +520,14 @@ const AdminPage: React.FC = () => {
                 return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuscript_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuscript_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>;
 
             case 'manuscript_form':
-                // Pastikan TIDAK ADA prop 'key' di sini
+                // Removed the 'key' prop here to prevent unmounting/remounting
                 return <ManuscriptForm manuscript={editingManuscript} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'blog':
                 return <BlogView articles={blogArticles} onAddNew={() => { setEditingBlogArticle(null); setView('blog_form'); }} onEdit={(article) => { setEditingBlogArticle(article); setView('blog_form');}} onDelete={(id, title) => handleDelete('blog_articles', id, title)} />;
 
             case 'blog_form':
-                // Pastikan TIDAK ADA prop 'key' di sini
+                // Removed the 'key' prop here to prevent unmounting/remounting
                 return <BlogForm article={editingBlogArticle} onSave={handleSave} onCancel={handleCancel} />;
 
             case 'guestbook':
