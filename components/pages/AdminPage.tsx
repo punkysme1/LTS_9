@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Manuscript, BlogArticle, GuestbookEntry } from '../types';
 import { supabase } from '../../services/supabaseClient';
-import * as XLSX from 'xlsx';
+import * => XLSX from 'xlsx';
 import {
     FaTachometerAlt, FaBook, FaNewspaper, FaComments, FaUserCircle,
     FaBars, FaPlus, FaUpload, FaDownload, FaPen, FaTrash
@@ -59,11 +59,11 @@ const InfoBox: React.FC<{ title: string; value: string | number; icon: React.Rea
 // --- FORM COMPONENTS ---
 const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => void, onCancel: () => void }> = ({ manuscript, onSave, onCancel }) => {
     // Debugging: Log saat ManuscriptForm di-render
-    console.log('ManuscriptForm Rendered', { manuscriptId: manuscript?.id, viewState: 'manuscript_form' });
+    console.log('ManuscriptForm Rendered', { manuscriptId: manuscript?.id, viewState: 'manuscript_form' }); //
 
     const [formData, setFormData] = useState<ManuscriptFormData>(() => {
         // Debugging: Log inisialisasi state
-        console.log('Initializing ManuscriptForm State with manuscript:', manuscript);
+        console.log('Initializing ManuscriptForm State with manuscript:', manuscript); //
         if (!manuscript) return emptyManuscript;
         const { id, created_at, ...rest } = manuscript;
         return {
@@ -79,7 +79,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
     const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         // Debugging: Log setiap kali handleChange dipanggil
-        console.log(`handleChange called for ${name}. New value: "${value}", type: "${type}"`);
+        console.log(`handleChange called for ${name}. New value: "${value}", type: "${type}"`); //
 
         setFormData(prev => {
             let updatedValue: any;
@@ -87,7 +87,7 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
                 updatedValue = (e.target as HTMLInputElement).checked;
             } else if (['konversi_masehi', 'jumlah_halaman'].includes(name)) {
                 updatedValue = value === '' ? undefined : parseInt(value, 10);
-                if (isNaN(updatedValue)) updatedValue = undefined; // Pastikan NaN tidak disimpan
+                if (isNaN(updatedValue)) updatedValue = undefined;
             } else {
                 updatedValue = value;
             }
@@ -132,25 +132,31 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
         setLoading(false);
     };
 
-    const renderField = (name: keyof ManuscriptFormData, label: string, type: 'input' | 'textarea' | 'select' | 'checkbox' = 'input', options: string[] = []) => {
+    const renderField = useCallback((name: keyof ManuscriptFormData, label: string, type: 'input' | 'textarea' | 'select' | 'checkbox' = 'input', options: string[] = []) => {
         // Pastikan nilai yang ditampilkan di input selalu string
         const displayValue = (formData[name] ?? '').toString();
 
         const inputType = ['konversi_masehi', 'jumlah_halaman'].includes(name) ? 'number' : 'text';
 
-        const commonProps = {
-            name,
-            onChange: handleChange,
-            id: name,
-            value: displayValue, // Nilai kontrol
-            placeholder: label,
-            key: `manuscript-input-${name}` // Ini akan memastikan setiap input memiliki key yang stabil
-        };
+        // NOTE: commonProps tidak perlu dipecah karena React.memo di Input/Select
+        // dan `key` sudah ditambahkan secara eksplisit.
+        // Namun, jika masalah masih ada, menguraikan prop secara eksplisit di sini
+        // seperti `name={name} onChange={handleChange} value={displayValue}`
+        // bisa menjadi langkah debugging terakhir untuk memastikan tidak ada objek prop baru
+        // yang dibuat secara tidak sengaja di {...commonProps}.
 
         if (type === 'checkbox') {
             return (
                 <div className="flex items-center gap-2 col-span-1 pt-2" key={`div-${name}`}>
-                    <input type="checkbox" {...commonProps} checked={!!formData[name]} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <input
+                        type="checkbox"
+                        name={name}
+                        onChange={handleChange}
+                        id={name}
+                        checked={!!formData[name]}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        key={`manuscript-input-${name}`} // key untuk input checkbox
+                    />
                     <label htmlFor={name} className="text-sm font-medium text-gray-700">{label}</label>
                 </div>
             );
@@ -159,16 +165,43 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
         return (
              <div className="col-span-1" key={`div-${name}`}>
                 <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                {type === 'input' && <Input {...commonProps} type={inputType} />}
-                {type === 'textarea' && <textarea {...commonProps} rows={3} className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>}
+                {type === 'input' && (
+                    <Input
+                        name={name}
+                        onChange={handleChange}
+                        id={name}
+                        value={displayValue}
+                        placeholder={label}
+                        type={inputType}
+                        key={`manuscript-input-${name}`} // key untuk Input
+                    />
+                )}
+                {type === 'textarea' && (
+                    <textarea
+                        name={name}
+                        onChange={handleChange}
+                        id={name}
+                        value={displayValue}
+                        placeholder={label}
+                        rows={3}
+                        className="w-full mt-1 px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        key={`manuscript-textarea-${name}`} // key untuk textarea
+                    ></textarea>
+                )}
                 {type === 'select' && (
-                    <Select {...commonProps}>
+                    <Select
+                        name={name}
+                        onChange={handleChange}
+                        id={name}
+                        value={displayValue}
+                        key={`manuscript-select-${name}`} // key untuk Select
+                    >
                         {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </Select>
                 )}
             </div>
         );
-    };
+    }, [formData, handleChange]); // formData dan handleChange adalah dependensi untuk useCallback renderField
 
     const FormSection: React.FC<{title: string; children: React.ReactNode}> = ({title, children}) => (
         <div className="p-4 sm:p-6 bg-white rounded-lg shadow-md">
@@ -186,7 +219,6 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
                 {renderField('kover', 'Kover')}
                 {renderField('jilid', 'Jilid')}
                 {renderField('ukuran_kover', 'Ukuran Kover')}
-                {/* BARIS DUPLIKASI INI TELAH DIHAPUS */}
                 {renderField('ukuran_kertas', 'Ukuran Kertas')}
                 {renderField('ukuran_dimensi', 'Ukuran Dimensi')}
                 {renderField('watermark', 'Watermark')}
