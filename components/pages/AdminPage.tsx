@@ -85,7 +85,8 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             } else if (['konversi_masehi', 'jumlah_halaman'].includes(name)) {
                 // Untuk input numerik, simpan sebagai number atau undefined jika kosong
                 const numericValue = value === '' ? undefined : parseInt(value, 10);
-                return { ...prev, [name]: numericValue };
+                // Pastikan NaN tidak disimpan, kembalikan undefined jika parseInt gagal
+                return { ...prev, [name]: isNaN(numericValue as number) ? undefined : numericValue };
             } else {
                 // Untuk input teks, simpan sebagai string
                 return { ...prev, [name]: value };
@@ -492,13 +493,27 @@ const AdminPage: React.FC = () => {
 
     const handleSave = () => {
         fetchData();
-        if (view === 'manuscript_form') setView('manuscripts');
-        if (view === 'blog_form') setView('blog');
+        // Setelah menyimpan, kembali ke tampilan daftar
+        if (view === 'manuscript_form') {
+            setView('manuscripts');
+            setEditingManuscript(null); // Reset editingManuscript setelah disimpan
+        }
+        if (view === 'blog_form') {
+            setView('blog');
+            setEditingBlogArticle(null); // Reset editingBlogArticle setelah disimpan
+        }
     };
 
     const handleCancel = () => {
-        if (view === 'manuscript_form') setView('manuscripts');
-        if (view === 'blog_form') setView('blog');
+        // Saat dibatalkan, kembali ke tampilan daftar
+        if (view === 'manuscript_form') {
+            setView('manuscripts');
+            setEditingManuscript(null); // Reset editingManuscript saat dibatalkan
+        }
+        if (view === 'blog_form') {
+            setView('blog');
+            setEditingBlogArticle(null); // Reset editingBlogArticle saat dibatalkan
+        }
     };
 
     const handleDelete = async (table: string, id: string, name: string) => {
@@ -520,7 +535,8 @@ const AdminPage: React.FC = () => {
 
         switch(view) {
             case 'manuscripts':
-                return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuskrip_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuskrip_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>;
+                // Perbaiki nama view dari 'manuskrip_form' menjadi 'manuscript_form'
+                return <ManuscriptView manuscripts={manuscripts} onAddNew={() => { setEditingManuscript(null); setView('manuscript_form'); }} onEdit={(ms) => { setEditingManuscript(ms); setView('manuscript_form'); }} onDelete={(id, title) => handleDelete('manuscripts', id, title)} onMassUpload={() => setShowMassUploadModal(true)}/>;
 
             case 'manuscript_form':
                 // Pastikan TIDAK ADA prop 'key' di sini, agar komponen tidak di-unmount/remount
@@ -554,6 +570,9 @@ const AdminPage: React.FC = () => {
     const handleMenuClick = (e: React.MouseEvent<HTMLAnchorElement>, targetView: View) => {
         e.preventDefault();
         setView(targetView);
+        // Reset editing state saat berganti view
+        setEditingManuscript(null);
+        setEditingBlogArticle(null);
     };
 
     return (
