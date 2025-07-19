@@ -6,8 +6,7 @@ import {
     FaTachometerAlt, FaBook, FaNewspaper, FaComments, FaUserCircle,
     FaBars, FaPlus, FaUpload, FaDownload, FaPen, FaTrash
 } from 'react-icons/fa';
-// Pastikan ini mengimpor komponen yang sudah di-memoize dari UI.tsx
-import { Button, Input, Select, Spinner } from '../UI';
+import { Button, Input, Select, Spinner } from '../UI'; // Pastikan ini mengimpor komponen yang sudah di-memoize
 
 // --- TYPE DEFINITIONS ---
 type ManuscriptFormData = Omit<Manuscript, 'id' | 'created_at'>;
@@ -77,11 +76,6 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
     });
     const [loading, setLoading] = useState(false);
 
-    // Gunakan useEffect untuk melacak perubahan formData (opsional untuk debugging mendalam)
-    // useEffect(() => {
-    //     console.log('formData updated:', formData);
-    // }, [formData]);
-
     const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         // Debugging: Log setiap kali handleChange dipanggil
@@ -98,8 +92,6 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
                 updatedValue = value;
             }
 
-            // Debugging: Log perubahan state yang akan dilakukan
-            // console.log(`Updating ${name} from "${prev[name as keyof ManuscriptFormData]}" to "${updatedValue}"`);
             return { ...prev, [name]: updatedValue };
         });
     }, []);
@@ -152,8 +144,6 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             id: name,
             value: displayValue, // Nilai kontrol
             placeholder: label,
-            // Debugging: Tambahkan key unik untuk setiap input
-            // Ini adalah langkah darurat jika React kehilangan elemen DOM-nya
             key: `manuscript-input-${name}` // Ini akan memastikan setiap input memiliki key yang stabil
         };
 
@@ -192,7 +182,21 @@ const ManuscriptForm: React.FC<{ manuscript: Manuscript | null, onSave: () => vo
             <FormSection title="Identitas & Afiliasi">{renderField('judul_dari_tim', 'Judul Dari Tim (Wajib)')}{renderField('judul_dari_afiliasi', 'Judul Dari Afiliasi')}{renderField('afiliasi', 'Afiliasi')}{renderField('link_digital_afiliasi', 'Link Digital Afiliasi')}{renderField('nama_koleksi', 'Nama Koleksi')}{renderField('nomor_koleksi', 'Nomor Koleksi')}{renderField('nomor_digitalisasi', 'Nomor Digitalisasi')}{renderField('kode_inventarisasi', 'Kode Inventarisasi')}{renderField('link_digital_tppkp', 'Link Digital TPPKP Qomaruddin')}</FormSection>
             <FormSection title="Link Gambar">{renderField('link_kover', 'Link Kover (Thumbnail)')}{renderField('link_konten', 'Link Konten (URL per baris)', 'textarea')}</FormSection>
             <FormSection title="Klasifikasi & Kepengarangan">{renderField('kategori_kailani', 'Klasifikasi (Kailani)', 'select', KATEGORI_KAILANI_OPTIONS)}{renderField('kategori_ilmu_pesantren', 'Kategori Ilmu Pesantren')}{renderField('pengarang', 'Pengarang')}{renderField('penyalin', 'Penyalin')}{renderField('tahun_penulisan_teks', 'Tahun Penulisan di Teks')}{renderField('konversi_masehi', 'Konversi Masehi', 'input')}{renderField('lokasi_penyalinan', 'Lokasi Penyalinan')}{renderField('asal_usul_naskah', 'Asal Usul Naskah')}{renderField('bahasa', 'Bahasa')}{renderField('aksara', 'Aksara')}</FormSection>
-            <FormSection title="Data Fisik Naskah">{renderField('kover', 'Kover')}{renderField('jilid', 'Jilid')}{renderField('ukuran_kover', 'Ukuran Kover')}{renderField('jilid', 'Jilid')}{renderField('ukuran_kover', 'Ukuran Kover')}{renderField('ukuran_kertas', 'Ukuran Kertas')}{renderField('ukuran_dimensi', 'Ukuran Dimensi')}{renderField('watermark', 'Watermark')}{renderField('countermark', 'Countermark')}{renderField('tinta', 'Tinta')}{renderField('jumlah_halaman', 'Jumlah Halaman', 'input')}{renderField('halaman_kosong', 'Halaman Kosong')}{renderField('jumlah_baris_per_halaman', 'Jumlah Baris Per Halaman')}{renderField('halaman_pemisah', 'Halaman Pemisah')}</FormSection>
+            <FormSection title="Data Fisik Naskah">
+                {renderField('kover', 'Kover')}
+                {renderField('jilid', 'Jilid')}
+                {renderField('ukuran_kover', 'Ukuran Kover')}
+                {/* BARIS DUPLIKASI INI TELAH DIHAPUS */}
+                {renderField('ukuran_kertas', 'Ukuran Kertas')}
+                {renderField('ukuran_dimensi', 'Ukuran Dimensi')}
+                {renderField('watermark', 'Watermark')}
+                {renderField('countermark', 'Countermark')}
+                {renderField('tinta', 'Tinta')}
+                {renderField('jumlah_halaman', 'Jumlah Halaman', 'input')}
+                {renderField('halaman_kosong', 'Halaman Kosong')}
+                {renderField('jumlah_baris_per_halaman', 'Jumlah Baris Per Halaman')}
+                {renderField('halaman_pemisah', 'Halaman Pemisah')}
+            </FormSection>
             <FormSection title="Seni & Rubrikasi">{renderField('rubrikasi', 'Rubrikasi', 'checkbox')}{renderField('iluminasi', 'Iluminasi', 'checkbox')}{renderField('ilustrasi', 'Ilustrasi', 'checkbox')}</FormSection>
             <FormSection title="Catatan Teks & Kondisi">{renderField('catatan_pinggir', 'Catatan Pinggir', 'checkbox')}{renderField('catatan_makna', 'Catatan Makna', 'checkbox')}{renderField('catatan_marginal', 'Catatan Marginal (Koreksi, Komentar)', 'textarea')}{renderField('kondisi_fisik_naskah', 'Kondisi Fisik Naskah', 'textarea')}{renderField('keterbacaan', 'Keterbacaan')}{renderField('kelengkapan_naskah', 'Kelengkapan Naskah')}{renderField('kolofon', 'Kolofon', 'textarea')}</FormSection>
             <FormSection title="Deskripsi & Catatan Umum">{renderField('deskripsi_umum', 'Deskripsi Umum', 'textarea')}{renderField('catatan_catatan', 'Catatan-catatan', 'textarea')}</FormSection>
